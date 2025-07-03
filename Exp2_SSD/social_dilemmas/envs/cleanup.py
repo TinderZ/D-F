@@ -91,12 +91,12 @@ class CleanupEnv(MapEnv):
             agent.fire_beam('F')
             updates = self.update_map_fire(agent.get_pos().tolist(),
                                            agent.get_orientation(), ACTIONS['FIRE'],
-                                           fire_char='F')
+                                           fire_char='F', single_beam=True)
         elif action == 'CLEAN':
             agent.fire_beam('C')
             updates = self.update_map_fire(agent.get_pos().tolist(),
                                            agent.get_orientation(),
-                                           ACTIONS['FIRE'],
+                                           ACTIONS['CLEAN'],
                                            fire_char='C',
                                            cell_types=['H'],
                                            update_char=['R'],

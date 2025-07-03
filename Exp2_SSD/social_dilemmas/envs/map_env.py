@@ -544,7 +544,7 @@ class MapEnv(MultiAgentEnv):
         self.custom_reset()
 
     def update_map_fire(self, firing_pos, firing_orientation, fire_len, fire_char, cell_types=[],
-                        update_char=[], blocking_cells='P'):
+                        update_char=[], blocking_cells='P', single_beam=False):
         """From a firing position, fire a beam that may clean or hit agents
 
         Notes:
@@ -575,6 +575,8 @@ class MapEnv(MultiAgentEnv):
             the character that should replace the affected cells.
         blocking_cells: (list of str)
             cells that block the firing beam
+        single_beam: (bool)
+            whether to fire a single beam or a triple beam
         Returns
         -------
         updates: (tuple (row, col, char))
@@ -584,9 +586,14 @@ class MapEnv(MultiAgentEnv):
         start_pos = np.asarray(firing_pos)
         firing_direction = ORIENTATIONS[firing_orientation]
         # compute the other two starting positions
-        right_shift = self.rotate_right(firing_direction)
-        firing_pos = [start_pos, start_pos + right_shift - firing_direction,
-                      start_pos - right_shift - firing_direction]
+        if single_beam:
+            firing_pos = [start_pos]
+        else:
+            right_shift = self.rotate_right(firing_direction)
+            firing_pos = [start_pos, start_pos + right_shift - firing_direction,
+                          start_pos - right_shift - firing_direction]
+        
+        
         firing_points = []
         updates = []
         for pos in firing_pos:
