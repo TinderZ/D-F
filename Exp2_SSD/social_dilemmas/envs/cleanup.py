@@ -7,7 +7,7 @@ from social_dilemmas.envs.agent import CleanupAgent  # CLEANUP_VIEW_SIZE
 
 # Add custom actions to the agent
 ACTIONS['FIRE'] = 5  # length of firing beam
-ACTIONS['CLEAN'] = 5  # length of cleanup beam
+ACTIONS['CLEAN'] = 3  # length of cleanup beam
 
 # Custom colour dictionary
 CLEANUP_COLORS = {'C': [100, 255, 255],  # Cyan cleaning beam
