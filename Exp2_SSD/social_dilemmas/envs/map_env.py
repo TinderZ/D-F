@@ -112,7 +112,7 @@ class MapEnv(MultiAgentEnv):
         updates: list(list(row, col, char))
             List of cells to place onto the map
         """
-        pass
+        return [], 0
 
     def custom_map_update(self):
         """Custom map updates that don't have to do with agent actions"""
@@ -166,16 +166,22 @@ class MapEnv(MultiAgentEnv):
             agent_action = self.agents[agent_id].action_map(action)
             agent_actions[agent_id] = agent_action
 
+        info = {}
+        for agent_id in self.agents.keys():
+            info[agent_id] = {'apples_collected': 0, 'waste_cleaned': 0}
+
         # move
         self.update_moves(agent_actions)
 
         for agent in self.agents.values():
             pos = agent.get_pos()
-            new_char = agent.consume(self.world_map[pos[0], pos[1]])
+            new_char, apple_consumed = agent.consume(self.world_map[pos[0], pos[1]])
             self.world_map[pos[0], pos[1]] = new_char
+            if apple_consumed > 0:
+                info[agent.agent_id]['apples_collected'] = apple_consumed
 
         # execute custom moves like firing
-        self.update_custom_moves(agent_actions)
+        self.update_custom_moves(agent_actions, info)
 
         # execute spawning events
         self.custom_map_update()
@@ -185,7 +191,6 @@ class MapEnv(MultiAgentEnv):
         observations = {}
         rewards = {}
         dones = {}
-        info = {}
 
         for agent in self.agents.values():
             agent.grid = map_with_agents
@@ -522,14 +527,16 @@ class MapEnv(MultiAgentEnv):
                         self.agents[agent_id].update_agent_pos(move)
                     break
 
-    def update_custom_moves(self, agent_actions):
+    def update_custom_moves(self, agent_actions, info):
         for agent_id, action in agent_actions.items():
             # check its not a move based action
             if 'MOVE' not in action and 'STAY' not in action and 'TURN' not in action:
                 agent = self.agents[agent_id]
-                updates = self.custom_action(agent, action)
+                updates, num_cleaned = self.custom_action(agent, action)
                 if len(updates) > 0:
                     self.update_map(updates)
+                if num_cleaned > 0:
+                    info[agent.agent_id]['waste_cleaned'] = num_cleaned
 
     def update_map(self, new_points):
         """For points in new_points, place desired char on the map"""
@@ -633,7 +640,7 @@ class MapEnv(MultiAgentEnv):
                     break
 
         self.beam_pos += firing_points
-        return updates
+        return updates, len(updates)
 
     def spawn_point(self):
         """Returns a randomly selected spawn point."""

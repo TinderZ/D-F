@@ -191,9 +191,9 @@ class HarvestAgent(Agent):
         """Defines how an agent interacts with the char it is standing on"""
         if char == 'A':
             self.reward_this_turn += 1
-            return ' '
+            return ' ', 1
         else:
-            return char
+            return char, 0
 
 
 CLEANUP_ACTIONS = BASE_ACTIONS.copy()
@@ -241,6 +241,6 @@ class CleanupAgent(Agent):
         """Defines how an agent interacts with the char it is standing on"""
         if char == 'A':
             self.reward_this_turn += 1
-            return ' '
+            return ' ', 1
         else:
-            return char
+            return char, 0

@@ -87,21 +87,22 @@ class CleanupEnv(MapEnv):
     def custom_action(self, agent, action):
         """Allows agents to take actions that are not move or turn"""
         updates = []
+        num_cleaned = 0
         if action == 'FIRE':
             agent.fire_beam('F')
-            updates = self.update_map_fire(agent.get_pos().tolist(),
+            updates, _ = self.update_map_fire(agent.get_pos().tolist(),
                                            agent.get_orientation(), ACTIONS['FIRE'],
                                            fire_char='F', single_beam=True)
         elif action == 'CLEAN':
             agent.fire_beam('C')
-            updates = self.update_map_fire(agent.get_pos().tolist(),
+            updates, num_cleaned = self.update_map_fire(agent.get_pos().tolist(),
                                            agent.get_orientation(),
                                            ACTIONS['CLEAN'],
                                            fire_char='C',
                                            cell_types=['H'],
                                            update_char=['R'],
                                            blocking_cells=['H'])
-        return updates
+        return updates, num_cleaned
 
     def custom_map_update(self):
         """"Update the probabilities and then spawn"""
