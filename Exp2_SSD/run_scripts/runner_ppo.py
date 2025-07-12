@@ -45,7 +45,7 @@ class Runner_ppo:
         self.args = args
         self.args.action_num = action_num
         self.episode_rewards = np.empty([self.args.round, self.args.num_agents, int(self.args.num_episodes/self.args.evaluate_cycle)])
-        self.save_data_path = './data/' + self.args.env + str(self.args.num_agents) + '/' + self.args.algorithm
+        self.save_data_path = '~/tflog/data/' + self.args.env + str(self.args.num_agents) + '/' + self.args.algorithm
         if not os.path.exists(self.save_data_path):
             os.makedirs(self.save_data_path)
         file = sorted(os.listdir(self.save_data_path))
@@ -71,7 +71,7 @@ class Runner_ppo:
             epsilon = np.min([1, self.args.epsilon_init + (
                         self.args.epsilon_final - self.args.epsilon_init) * epi / self.args.epsilon_steplen])
 
-            while not terminated and step < self.args.num_steps:
+            while not terminated and step < self.args.num_steps_train:
                 o, u, u_probability, r, o_next, terminate = [], [], [], [], [], []
                 actions_dict = {}
                 for i in range(self.args.num_agents):
