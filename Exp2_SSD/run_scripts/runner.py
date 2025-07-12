@@ -78,19 +78,24 @@ class Runner:
             return None
 
         self.rolloutWorker = RolloutWorker(self.env, self.agents, self.args)
-        self.writer = SummaryWriter("./runs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
+        self.writer = SummaryWriter("~/tf-logs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
         train_steps = 0
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
             if epi % self.args.evaluate_cycle == 0:
-                episode_individual_reward = self.evaluate()
+                # 修改: 接收 evaluate 函数返回的苹果数量
+                episode_individual_reward, avg_apples_collected = self.evaluate()
+                
                 episode_reward = np.sum(episode_individual_reward)
                 self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = episode_individual_reward
                 for i in range(self.args.num_agents):
                     self.writer.add_scalar("Agent_{}_reward".format(str(i)), episode_individual_reward[i], epi)
+                    # 新增: 将每个 agent 收集的苹果数写入 TensorBoard
+                    self.writer.add_scalar(f"Agent_{i}_apples_collected", avg_apples_collected[i], epi)
                 self.writer.add_scalar("Total_reward", episode_reward, epi)
+                self.writer.add_scalar("Total_apples_collected", np.sum(avg_apples_collected), epi)
                 print("training episode {}, total_reward {}, algorithm {}, agent_num {}".format(epi, episode_reward, self.args.algorithm, self.args.num_agents))
-            episode_data, _ = self.rolloutWorker.generate_episode(epi)
+            episode_data, _, _ = self.rolloutWorker.generate_episode(epi)
             self.buffer.add(episode_data)
             if self.args.batch_size < self.buffer.__len__():
                 for train_step in range(self.args.train_steps):
@@ -137,11 +142,14 @@ class Runner:
             np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
 
     def evaluate(self):
-        episode_rewards = 0
+        episode_rewards = np.zeros(self.args.num_agents)
+        # 新增: 为苹果数创建一个累加器
+        total_apples_collected = np.zeros(self.args.num_agents)
         for epi in range(self.args.evaluate_epi):
-            _, episode_reward = self.rolloutWorker.generate_episode(epi, evaluate=True)
+            _, episode_reward, episode_apples = self.rolloutWorker.generate_episode(epi, evaluate=True)
             episode_rewards += episode_reward
-        return episode_rewards / self.args.evaluate_epi
+            total_apples_collected += episode_apples
+        return episode_rewards / self.args.evaluate_epi, total_apples_collected / self.args.evaluate_epi
 
 
 
