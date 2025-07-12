@@ -17,6 +17,7 @@ parser.add_argument("--env", type=str, default="Cleanup") #Cleanup, Harvest
 parser.add_argument("--num_agents", type=int, default=5)
 parser.add_argument("--num_episodes", type=int, default=10000)
 parser.add_argument("--num_steps", type=int, default=1000)
+parser.add_argument("--num_steps_train", type=int, default=300)
 parser.add_argument("--evaluate_cycle", type=int, default=1)
 parser.add_argument("--train_steps", type=int, default=1)
 parser.add_argument("--evaluate_epi", type=int, default=1)
