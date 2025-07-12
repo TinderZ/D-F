@@ -1,162 +1,54 @@
-import sys
-sys.path.append("../")
 import numpy as np
-import os
-from replay_buffer.replay_buffer_episode import ReplayBuffer
-from social_dilemmas.envs.cleanup import CleanupEnv
-from social_dilemmas.envs.harvest import HarvestEnv
-from ray.tune.registry import register_env
-from torch.utils.tensorboard import SummaryWriter
-import matplotlib.pyplot as plt
-from learners.DQN import DQN
-from learners.SOCIAL import DQN_SOCIAL
-from learners.PPO import PPO
-from learners.DDPG import DDPG
-from learners.MADDPG import MADDPG
-from learners.QMIX_SHARE import QMIX_SHARE
-from learners.MAPPO import MAPPO
-from tqdm import tqdm
-
-def make_env(args):
-    if args.env == "Harvest":
-        single_env = HarvestEnv(num_agents=args.num_agents)
-        env_name = "HarvestEnv"
-        def env_creator(_):
-            return HarvestEnv(num_agents=args.num_agents)
-    elif args.env == "Cleanup":
-        single_env = CleanupEnv(num_agents=args.num_agents)
-        env_name = "CleanupEnv"
-        def env_creator(_):
-            return CleanupEnv(num_agents=args.num_agents)
-    else:
-        return 0
-    register_env(env_name, env_creator)
-    if env_name == "HarvestEnv":
-        action_num = 8
-    else:
-        action_num = 9
-    return single_env, action_num
-
-
-class Runner:
-    def __init__(self, args):
-        env, action_num = make_env(args)
+class RolloutWorker:
+    def __init__(self, env, agents, args):
         self.env = env
+        self.agents = agents
         self.args = args
-        self.args.action_num = action_num
-        self.episode_rewards = np.empty([self.args.round, self.args.num_agents, int(self.args.num_episodes/self.args.evaluate_cycle)])
-        self.save_data_path = './data/' + self.args.env + str(self.args.num_agents) + '/' + self.args.algorithm
+        print('Init RolloutWorker')
 
-
-        if not os.path.exists(self.save_data_path):
-            os.makedirs(self.save_data_path)
-
-        file = sorted(os.listdir(self.save_data_path))
-        if file == []:
-            self.next_num = 1
+    def generate_episode(self, episode_num, evaluate=False):
+        epi_o, epi_u, epi_r, epi_o_next, epi_terminate = [], [], [], [], []
+        _, observation = self.env.reset()
+        for i in range(self.args.num_agents):
+            observation["agent-" + str(i)] = observation["agent-" + str(i)] / 256
+        terminated = False
+        step = 0
+        episode_reward = np.zeros(self.args.num_agents)
+        # epsilon
+        if evaluate:
+            epsilon = 1
         else:
-            self.next_num = int(file[-1].split('.')[0][-1]) + 1
+            epsilon = np.min([1, self.args.epsilon_init + (self.args.epsilon_final - self.args.epsilon_init) * episode_num / self.args.epsilon_steplen])
 
-    def run(self, num):
-        self.buffer = ReplayBuffer(self.args)
-        if self.args.algorithm == "DQN" or self.args.algorithm == "DQN-AVG" or self.args.algorithm == "DQN-MIN" or self.args.algorithm == "DQN-RMF" or self.args.algorithm == "DQN-IA":
-            self.agents = [DQN(self.args, self.args.action_num) for _ in range(self.args.num_agents)]
-            from run_scripts.rollout import RolloutWorker
-        elif self.args.algorithm == "SOCIAL":
-            self.agents = [DQN_SOCIAL(self.args, self.args.action_num) for _ in range(self.args.num_agents)]
-            from run_scripts.rollout_social import RolloutWorker
-        elif self.args.algorithm == "DDPG":
-            self.agents = [DDPG(self.args, self.args.action_num) for _ in range(self.args.num_agents)]
-            from run_scripts.rollout import RolloutWorker
-        elif self.args.algorithm == "MADDPG":
-            self.agents = [MADDPG(self.args, self.args.action_num) for _ in range(self.args.num_agents)]
-            from run_scripts.rollout_maddpg import RolloutWorker
-        elif self.args.algorithm == "QMIX":
-            self.agents = QMIX_SHARE(self.args, self.args.action_num)
-            from run_scripts.rollout_qmix import RolloutWorker
-        else:
-            return None
+        while not terminated and step < self.args.num_steps:
+            o, u, r, o_next, terminate = [], [], [], [], []
+            actions_dict = {}
+            for i in range(self.args.num_agents):
+                o.append(observation["agent-" + str(i)])
+                action = self.agents[i].choose_action(o[i], epsilon)
+                u.append(action)
+                actions_dict["agent-" + str(i)] = action
+            _, observation_next, reward, dones, infos = self.env.step(actions_dict)
+            for i in range(self.args.num_agents):
+                observation_next["agent-" + str(i)] = observation_next["agent-" + str(i)] / 256
+                o_next.append(observation_next["agent-" + str(i)])
+                r.append(reward["agent-"+str(i)])
+                terminate.append(dones["agent-" + str(i)])
+            episode_reward += np.array(r)
+            epi_o.append(o)
+            epi_u.append(u)
+            epi_r.append(r)
+            epi_o_next.append(o_next)
+            epi_terminate.append(terminate)
 
-        self.rolloutWorker = RolloutWorker(self.env, self.agents, self.args)
-        self.writer = SummaryWriter("~/tf-logs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
-        train_steps = 0
-        for epi in tqdm(range(self.args.num_episodes)):
-            print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
-            if epi % self.args.evaluate_cycle == 0:
-                # 修改: 接收 evaluate 函数返回的苹果数量
-                episode_individual_reward, avg_apples_collected = self.evaluate()
-                
-                episode_reward = np.sum(episode_individual_reward)
-                self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = episode_individual_reward
-                for i in range(self.args.num_agents):
-                    self.writer.add_scalar("Agent_{}_reward".format(str(i)), episode_individual_reward[i], epi)
-                    # 新增: 将每个 agent 收集的苹果数写入 TensorBoard
-                    self.writer.add_scalar(f"Agent_{i}_apples_collected", avg_apples_collected[i], epi)
-                self.writer.add_scalar("Total_reward", episode_reward, epi)
-                self.writer.add_scalar("Total_apples_collected", np.sum(avg_apples_collected), epi)
-                print("training episode {}, total_reward {}, algorithm {}, agent_num {}".format(epi, episode_reward, self.args.algorithm, self.args.num_agents))
-            episode_data, _, _ = self.rolloutWorker.generate_episode(epi)
-            self.buffer.add(episode_data)
-            if self.args.batch_size < self.buffer.__len__():
-                for train_step in range(self.args.train_steps):
-                    if self.args.algorithm == "QMIX":
-                        mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                        loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
-                    elif self.args.algorithm == "QMIX_SHARE":
-                        mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                        loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
-                    elif self.args.algorithm == "QMIX_SHARE_STATE":
-                        mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                        loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
-                    elif self.args.algorithm == "VDN_SHARE":
-                        mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                        loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
-                    elif self.args.algorithm == "VDN_SHARE_STATE":
-                        mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                        loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
-                    elif self.args.algorithm == "MADDPG":
-                        mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                        for i in range(self.args.num_agents):
-                            closs, aloss = self.agents[i].learn(mini_batch, i, self.agents)
-                            self.writer.add_scalar("Agent_{}_CLoss".format(str(i)), closs, train_steps)
-                            self.writer.add_scalar("Agent_{}_ALoss".format(str(i)), aloss, train_steps)
-                    elif self.args.algorithm == "DDPG":
-                        for i in range(self.args.num_agents):
-                            mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                            closs, aloss = self.agents[i].learn(mini_batch, i)
-                            self.writer.add_scalar("Agent_{}_CLoss".format(str(i)), closs, train_steps)
-                            self.writer.add_scalar("Agent_{}_ALoss".format(str(i)), aloss, train_steps)
-                    elif self.args.algorithm == "DQN" or self.args.algorithm == "DQN-AVG" or self.args.algorithm == "DQN-MIN" or self.args.algorithm == "DQN-RMF" or self.args.algorithm == "DQN-IA" or self.args.algorithm == "SOCIAL":
-                        for i in range(self.args.num_agents):
-                            mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
-                            loss = self.agents[i].learn(mini_batch, i)
-                            self.writer.add_scalar("Agent_{}_Loss".format(str(i)), loss, train_steps)
-                    else:
-                        return None
-                    train_steps += 1
-            np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
+            observation = observation_next
+            step += 1
 
-    def evaluate(self):
-        episode_rewards = np.zeros(self.args.num_agents)
-        # 新增: 为苹果数创建一个累加器
-        total_apples_collected = np.zeros(self.args.num_agents)
-        for epi in range(self.args.evaluate_epi):
-            _, episode_reward, episode_apples = self.rolloutWorker.generate_episode(epi, evaluate=True)
-            episode_rewards += episode_reward
-            total_apples_collected += episode_apples
-        return episode_rewards / self.args.evaluate_epi, total_apples_collected / self.args.evaluate_epi
+        episode = dict(o=epi_o.copy(),
+                       u=epi_u.copy(),
+                       r=epi_r.copy(),
+                       o_next=epi_o_next.copy(),
+                       terminate=epi_terminate.copy()
+                       )
 
-
-
-
-
-
-
-
-
-
+        return episode, episode_reward
