@@ -14,6 +14,7 @@ class RolloutWorker:
         terminated = False
         step = 0
         episode_reward = np.zeros(self.args.num_agents)
+        episode_apples_collected = np.zeros(self.args.num_agents)
         # epsilon
         if evaluate:
             epsilon = 1
@@ -35,6 +36,7 @@ class RolloutWorker:
                 actions_dict["agent-" + str(i)] = action
             _, observation_next, reward, dones, infos = self.env.step(actions_dict)
             u_next, u_next_probability = [], []
+            # print(infos)
             for i in range(self.args.num_agents):
                 observation_next["agent-" + str(i)] = observation_next["agent-" + str(i)] / 256
                 o_next.append(observation_next["agent-" + str(i)])
@@ -43,6 +45,10 @@ class RolloutWorker:
                 action_next, action_next_probability = self.agents[i].choose_action(o_next[i], epsilon)
                 u_next.append(action_next)
                 u_next_probability.append(action_next_probability)
+                # 新增: 从 infos 中累加苹果数量
+                agent_key = f"agent-{i}"
+                if agent_key in infos and 'apples_collected' in infos[agent_key]:
+                    episode_apples_collected[i] += infos[agent_key]['apples_collected']
             episode_reward += np.array(r)
             epi_o.append(o)
             epi_u.append(u)
@@ -65,4 +71,4 @@ class RolloutWorker:
                        terminate=epi_terminate.copy()
                        )
 
-        return episode, episode_reward
+        return episode, episode_reward, episode_apples_collected
