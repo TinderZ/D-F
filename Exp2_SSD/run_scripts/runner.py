@@ -17,6 +17,30 @@ from learners.QMIX_SHARE import QMIX_SHARE
 from learners.MAPPO import MAPPO
 from tqdm import tqdm
 
+def calculate_gini(values_list):
+    if not isinstance(values_list, list) and not isinstance(values_list, np.ndarray):
+        return 0.0
+    
+    values = np.array(values_list, dtype=np.float64)
+    
+    if len(values) == 0:
+        return 0.0
+
+    mean_val = np.mean(values)
+
+    if mean_val == 0:
+        return 0.0
+
+    n = len(values)
+    if n <= 1:
+        return 0.0
+        
+    sum_abs_diff = np.sum(np.abs(values - values[:, np.newaxis]))
+    denominator = 2 * n**2 * mean_val
+    if denominator == 0:
+        return 0.0
+    return sum_abs_diff / denominator
+
 def make_env(args):
     if args.env == "Harvest":
         single_env = HarvestEnv(num_agents=args.num_agents)
@@ -83,19 +107,41 @@ class Runner:
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
             if epi % self.args.evaluate_cycle == 0:
-                # 修改: 接收 evaluate 函数返回的苹果数量
-                episode_individual_reward, avg_apples_collected = self.evaluate()
-                
-                episode_reward = np.sum(episode_individual_reward)
-                self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = episode_individual_reward
+                avg_individual_reward, avg_apples_collected, avg_wastes_cleaned = self.evaluate()
+                self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = avg_individual_reward
+
+                total_reward = np.sum(avg_individual_reward)
+                total_apples_collected = np.sum(avg_apples_collected)
+                total_wastes_cleaned = np.sum(avg_wastes_cleaned)
+
+                apples_variance = np.var(avg_apples_collected)
+                apples_std_dev = np.std(avg_apples_collected)
+                apples_gini = calculate_gini(avg_apples_collected)
+
+                wastes_variance = np.var(avg_wastes_cleaned)
+                wastes_std_dev = np.std(avg_wastes_cleaned)
+                wastes_gini = calculate_gini(avg_wastes_cleaned)
+
                 for i in range(self.args.num_agents):
-                    self.writer.add_scalar("Agent_{}_reward".format(str(i)), episode_individual_reward[i], epi)
-                    # 新增: 将每个 agent 收集的苹果数写入 TensorBoard
+                    self.writer.add_scalar(f"Agent_{i}_reward", avg_individual_reward[i], epi)
                     self.writer.add_scalar(f"Agent_{i}_apples_collected", avg_apples_collected[i], epi)
-                self.writer.add_scalar("Total_reward", episode_reward, epi)
-                self.writer.add_scalar("Total_apples_collected", np.sum(avg_apples_collected), epi)
-                print("training episode {}, total_reward {}, algorithm {}, agent_num {}".format(epi, episode_reward, self.args.algorithm, self.args.num_agents))
-            episode_data, _, _ = self.rolloutWorker.generate_episode(epi)
+                    self.writer.add_scalar(f"Agent_{i}_wastes_cleaned", avg_wastes_cleaned[i], epi)
+
+                self.writer.add_scalar("Total_reward", total_reward, epi)
+                self.writer.add_scalar("Total_apples_collected", total_apples_collected, epi)
+                self.writer.add_scalar("Total_wastes_cleaned", total_wastes_cleaned, epi)
+
+                self.writer.add_scalar("Apples_Variance", apples_variance, epi)
+                self.writer.add_scalar("Apples_StdDev", apples_std_dev, epi)
+                self.writer.add_scalar("Apples_Gini", apples_gini, epi)
+
+                self.writer.add_scalar("Wastes_Variance", wastes_variance, epi)
+                self.writer.add_scalar("Wastes_StdDev", wastes_std_dev, epi)
+                self.writer.add_scalar("Wastes_Gini", wastes_gini, epi)
+                print(f"training episode {epi}, total_reward {total_reward}, algorithm {self.args.algorithm}, agent_num {self.args.num_agents}")
+
+            # Since different rollout workers might return different number of values, we just get the first one.
+            episode_data = self.rolloutWorker.generate_episode(epi)[0]
             self.buffer.add(episode_data)
             if self.args.batch_size < self.buffer.__len__():
                 for train_step in range(self.args.train_steps):
@@ -142,14 +188,26 @@ class Runner:
             np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
 
     def evaluate(self):
-        episode_rewards = np.zeros(self.args.num_agents)
-        # 新增: 为苹果数创建一个累加器
-        total_apples_collected = np.zeros(self.args.num_agents)
+        all_rewards = []
+        all_apples = []
+        all_wastes = []
         for epi in range(self.args.evaluate_epi):
-            _, episode_reward, episode_apples = self.rolloutWorker.generate_episode(epi, evaluate=True)
-            episode_rewards += episode_reward
-            total_apples_collected += episode_apples
-        return episode_rewards / self.args.evaluate_epi, total_apples_collected / self.args.evaluate_epi
+            # The return values of generate_episode are different for different algorithms.
+            # For SOCIAL, it returns: episode, episode_reward, episode_apples_collected, episode_waste_cleaned
+            # For others, it might return: episode, episode_reward, win_tag, episode_apples, episode_waste
+            # We handle this by checking the length of the returned tuple.
+            results = self.rolloutWorker.generate_episode(epi, evaluate=True)
+            if len(results) == 5:
+                _, episode_reward, _, episode_apples, episode_waste = results
+            else:
+                _, episode_reward, episode_apples, episode_waste = results
+
+            all_rewards.append(episode_reward)
+            all_apples.append(episode_apples)
+            all_wastes.append(episode_waste)
+        
+        # 返回每个agent在所有episodes中的平均值
+        return np.mean(all_rewards, axis=0), np.mean(all_apples, axis=0), np.mean(all_wastes, axis=0)
 
 
 

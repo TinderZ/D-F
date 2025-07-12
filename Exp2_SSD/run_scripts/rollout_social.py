@@ -15,6 +15,7 @@ class RolloutWorker:
         step = 0
         episode_reward = np.zeros(self.args.num_agents)
         episode_apples_collected = np.zeros(self.args.num_agents)
+        episode_waste_cleaned = np.zeros(self.args.num_agents)  # 新增: 为waste数创建一个累加器
         # epsilon
         if evaluate:
             epsilon = 1
@@ -45,10 +46,14 @@ class RolloutWorker:
                 action_next, action_next_probability = self.agents[i].choose_action(o_next[i], epsilon)
                 u_next.append(action_next)
                 u_next_probability.append(action_next_probability)
-                # 新增: 从 infos 中累加苹果数量
+                # 从 infos 中累加苹果数量
                 agent_key = f"agent-{i}"
                 if agent_key in infos and 'apples_collected' in infos[agent_key]:
                     episode_apples_collected[i] += infos[agent_key]['apples_collected']
+                # 新增: 如果环境是 'cleanup'，则累加 waste 数量
+                if self.args.env == 'Cleanup':
+                    if agent_key in infos and 'waste_cleaned' in infos[agent_key]:
+                        episode_waste_cleaned[i] += infos[agent_key]['waste_cleaned']
             episode_reward += np.array(r)
             epi_o.append(o)
             epi_u.append(u)
@@ -71,4 +76,4 @@ class RolloutWorker:
                        terminate=epi_terminate.copy()
                        )
 
-        return episode, episode_reward, episode_apples_collected
+        return episode, episode_reward, episode_apples_collected, episode_waste_cleaned
