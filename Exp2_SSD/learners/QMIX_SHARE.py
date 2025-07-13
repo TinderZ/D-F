@@ -29,7 +29,7 @@ class QMIX_SHARE:
         self.optimizer = torch.optim.Adam(self.eval_parameters, lr=args.lr)
 
     def choose_action(self, obs, episolon, agent_id):
-        if np.random.rand() <= episolon:
+        if np.random.rand() > episolon:
             obsnp = np.array(obs)
             obs = torch.unsqueeze(torch.unsqueeze(torch.from_numpy(obsnp.copy()), 0),0)
             obs = obs.float()

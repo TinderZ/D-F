@@ -89,9 +89,9 @@ class DQN_SOCIAL():
             action_value = self.eval_net(obs)
             action_prob = F.gumbel_softmax(action_value, dim=2).squeeze()
             if np.random.rand() <= episolon:
-                action = torch.max(action_value, 2)[1].cpu().data.numpy()[0][0]
-            else:
                 action = np.random.randint(0, self.action_num)
+            else:
+                action = torch.max(action_value, 2)[1].cpu().data.numpy()[0][0]
         return action, action_prob.cpu().numpy()
 
     def KL_divergence(self, p1, p2):

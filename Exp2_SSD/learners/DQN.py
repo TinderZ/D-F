@@ -45,7 +45,7 @@ class DQN():
         self.loss_func = nn.MSELoss()
 
     def choose_action(self, obs, episolon):
-        if np.random.rand() <= episolon:
+        if np.random.rand() > episolon:
             obsnp = np.array(obs)
             obs = torch.unsqueeze(torch.unsqueeze(torch.from_numpy(obsnp.copy()), 0),0)
             obs = obs.float()
