@@ -79,7 +79,7 @@ class Runner_df:
                                                                                                     self.args.lamdaw) + "-e" + str(
                                                                                                     self.args.lamdae),
                                                                                                 self.args.num_agents))
-            episode_data, _ = self.rolloutWorker.generate_episode(epi)
+            episode_data, _, _, _ = self.rolloutWorker.generate_episode(epi)
             self.buffer.add(episode_data)
             if self.args.batch_size < self.buffer.__len__():
                 if epi % self.args.fed_epis == 0:
@@ -109,7 +109,7 @@ class Runner_df:
     def evaluate(self):
         episode_rewards = 0
         for epi in range(self.args.evaluate_epi):
-            _, episode_reward = self.rolloutWorker.generate_episode(epi, evaluate=True)
+            _, episode_reward, _, _ = self.rolloutWorker.generate_episode(epi, evaluate=True)
             episode_rewards += episode_reward
         return episode_rewards / self.args.evaluate_epi
 
