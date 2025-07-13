@@ -27,6 +27,12 @@ pip install -r requirements.txt
 
 # Training
 python run_scripts/main.py --algorithm=DF
+
+python run_scripts/main.py --algorithm=SOCIAL
+
+
+
+
 ```
 
 ## Results

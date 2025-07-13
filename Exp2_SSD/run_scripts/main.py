@@ -28,7 +28,7 @@ parser.add_argument("--gamma", type=float, default=0.999)
 parser.add_argument("--lamdaw", type=float, default=1)
 parser.add_argument("--lamdae", type=float, default=0.1)
 parser.add_argument("--cuda", type=bool, default=False)
-parser.add_argument("--round", type=int, default=5)
+parser.add_argument("--round", type=int, default=1)
 args = parser.parse_args()
 
 if torch.cuda.is_available():

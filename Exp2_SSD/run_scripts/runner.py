@@ -102,7 +102,9 @@ class Runner:
             return None
 
         self.rolloutWorker = RolloutWorker(self.env, self.agents, self.args)
-        self.writer = SummaryWriter("~/tf-logs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
+        #self.writer = SummaryWriter("~/tf-logs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
+        self.writer = SummaryWriter("./runs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
+
         train_steps = 0
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
@@ -138,7 +140,7 @@ class Runner:
                 self.writer.add_scalar("Wastes_Variance", wastes_variance, epi)
                 self.writer.add_scalar("Wastes_StdDev", wastes_std_dev, epi)
                 self.writer.add_scalar("Wastes_Gini", wastes_gini, epi)
-                print(f"training episode {epi}, total_reward {total_reward}, algorithm {self.args.algorithm}, agent_num {self.args.num_agents}")
+                print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, algorithm {self.args.algorithm}")
 
             # Since different rollout workers might return different number of values, we just get the first one.
             episode_data = self.rolloutWorker.generate_episode(epi)[0]
