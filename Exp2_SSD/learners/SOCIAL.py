@@ -95,7 +95,7 @@ class DQN_SOCIAL():
         return action, action_prob.cpu().numpy()
 
     def KL_divergence(self, p1, p2):
-        kl = torch.zeros((self.args.batch_size, self.args.num_steps, 1))
+        kl = torch.zeros((self.args.batch_size, self.args.num_steps_train, 1))
         if self.args.cuda:
             kl = kl.cuda()
         for i in range(p1.shape[2]):
@@ -114,7 +114,7 @@ class DQN_SOCIAL():
         batch_reward = torch.from_numpy(episode_data['r']).float()
         batch_next_state = torch.from_numpy(episode_data['o_next']).float()
         batch_next_action = torch.from_numpy(episode_data['u_next']).long()
-        batch_reward_in = torch.Tensor(np.zeros((self.args.batch_size, self.args.num_steps, 1))).long()
+        batch_reward_in = torch.Tensor(np.zeros((self.args.batch_size, self.args.num_steps_train, 1))).long()
 
         if self.args.cuda:
             batch_state = batch_state.cuda()
@@ -150,10 +150,10 @@ class DQN_SOCIAL():
         reward = reward + (1-ENV_ALPHA) * r_in_scale * batch_reward_in
         reward = (reward - reward.mean() ) / (reward.std() + 1e-4)
         if self.args.double_dqn:
-            q_target = reward + self.args.gamma * q_next.gather(2, self.eval_net(next_state).max(2)[1].unsqueeze(dim=2)).view(self.args.batch_size, self.args.num_steps, 1)
+            q_target = reward + self.args.gamma * q_next.gather(2, self.eval_net(next_state).max(2)[1].unsqueeze(dim=2)).view(self.args.batch_size, self.args.num_steps_train, 1)
             q_target = q_target.detach()
         else:
-            q_target = reward + self.args.gamma * q_next.max(2)[0].view(self.args.batch_size, self.args.num_steps, 1)
+            q_target = reward + self.args.gamma * q_next.max(2)[0].view(self.args.batch_size, self.args.num_steps_train, 1)
             q_target = q_target.detach()
 
         loss1 = self.loss_func1(q_eval, q_target)
@@ -162,7 +162,7 @@ class DQN_SOCIAL():
         loss2 = 0
         for j_other in range(self.args.num_agents - 1):
             other_next_action_prob_prediction = p_prediction[:, :, j_other*self.action_num:j_other*self.action_num+self.action_num]
-            loss2 += self.loss_func2(other_next_action_prob_prediction.reshape(self.args.batch_size*self.args.num_steps,-1), other_next_action[:, :, j_other, ...].reshape(self.args.batch_size*self.args.num_steps))
+            loss2 += self.loss_func2(other_next_action_prob_prediction.reshape(self.args.batch_size*self.args.num_steps_train,-1), other_next_action[:, :, j_other, ...].reshape(self.args.batch_size*self.args.num_steps_train))
 
         loss = loss1 + loss2
 

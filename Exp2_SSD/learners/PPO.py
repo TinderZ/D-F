@@ -74,10 +74,10 @@ class PPO():
         batch_return = torch.zeros(batch_state.shape[0], batch_state.shape[1], 1)
         if self.args.cuda:
             batch_return = batch_return.cuda()
-        for step in range(self.args.num_steps - 1, -1, -1):
-            if step == self.args.num_steps - 1:
+        for step in range(self.args.num_steps_train - 1, -1, -1):
+            if step == self.args.num_steps_train - 1:
                 batch_return[:, step, ...] = batch_reward[:, step, agent_id, ...]
-            if step < self.args.num_steps - 1:
+            if step < self.args.num_steps_train - 1:
                 batch_return[:, step, ...] = batch_reward[:, step, agent_id, ...] + self.args.gamma * batch_return[:, step + 1, ...]
         batch_return = (batch_return - batch_return.mean()) / (batch_return.std() + 1e-5)
         V = self.critic_net(batch_state[:, :, agent_id, ...])

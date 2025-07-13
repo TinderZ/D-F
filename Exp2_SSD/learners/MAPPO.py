@@ -67,28 +67,27 @@ class MAPPO():
         batch_state = torch.from_numpy(np.array(episode_data['s'])).float()
         batch_action = torch.from_numpy(np.array(episode_data['u'])).long()
         batch_action_prob = torch.from_numpy(np.array(episode_data['u_probability'])).float()
-        batch_reward = torch.from_numpy(np.array(episode_data['r'])).float()
-
+        batch_reward = torch.from_numpy(np.array(episode_data['r'])).float().unsqueeze(dim=3)
+        batch_state_next = torch.from_numpy(np.array(episode_data['s_next'])).float()
         if self.args.cuda:
-            batch_observation = batch_observation.cuda()
             batch_state = batch_state.cuda()
             batch_action = batch_action.cuda()
             batch_action_prob = batch_action_prob.cuda()
             batch_reward = batch_reward.cuda()
+            batch_state = batch_state.cuda()
+            batch_state_next = batch_state_next.cuda()
 
-        batch_reward = batch_reward.mean(dim=1)
-        total_value_loss = 0
-        total_actor_loss = 0
-        batch_return = torch.zeros(batch_state.shape[0], 1)
+        value_loss = 0
+        action_loss = 0
+        batch_return = torch.zeros(batch_state.shape[0], batch_state.shape[1], 1)
         if self.args.cuda:
             batch_return = batch_return.cuda()
-        for step in range(self.args.num_steps - 1, -1, -1):
-            if step == self.args.num_steps - 1:
-                batch_return[step, ...] = batch_reward[step, ...]
-            if step < self.args.num_steps - 1:
-                batch_return[step, ...] = batch_reward[step, ...] + self.args.gamma * batch_return[step + 1, ...]
-        batch_return = (batch_return - batch_return.mean(dim=0).unsqueeze(dim=1)) / (
-                batch_return.std(dim=0).unsqueeze(dim=1) + 1e-7)
+        for step in range(self.args.num_steps_train - 1, -1, -1):
+            if step == self.args.num_steps_train - 1:
+                batch_return[:, step, ...] = batch_reward[:, step, 0, ...]
+            if step < self.args.num_steps_train - 1:
+                batch_return[:, step, ...] = batch_reward[:, step, 0, ...] + self.args.gamma * batch_return[:, step + 1, ...]
+        batch_return = (batch_return - batch_return.mean()) / (batch_return.std() + 1e-5)
         V = self.critic_net(batch_state)
         advantage = (batch_return - V).detach()
         for _ in range(self.args.training_times):

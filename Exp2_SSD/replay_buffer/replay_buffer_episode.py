@@ -14,29 +14,29 @@ class ReplayBuffer(object):
         self.args = args
         if self.args.env == "Harvest":
             self._storage = {
-                            's': np.empty([self.args.buffer_size, self.args.num_steps, 16, 38, 3]),
-                            's_next': np.empty([self.args.buffer_size, self.args.num_steps, 16, 38, 3]),
-                            'o': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 15, 15, 3]),
-                            'u': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1]),
-                            'u_probability': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1]),
-                            'u_probability_all': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 8]),
-                            'r': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents,  1]),
-                            'o_next': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 15, 15, 3]),
-                            'u_next': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1]),
-                            'terminate': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1])
+                            's': np.empty([self.args.buffer_size, self.args.num_steps_train, 16, 38, 3]),
+                            's_next': np.empty([self.args.buffer_size, self.args.num_steps_train, 16, 38, 3]),
+                            'o': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 15, 15, 3]),
+                            'u': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1]),
+                            'u_probability': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1]),
+                            'u_probability_all': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 8]),
+                            'r': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents,  1]),
+                            'o_next': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 15, 15, 3]),
+                            'u_next': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1]),
+                            'terminate': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1])
                             }
         else:
             self._storage = {
-                            's': np.empty([self.args.buffer_size, self.args.num_steps, 25, 18, 3]),
-                            's_next': np.empty([self.args.buffer_size, self.args.num_steps, 25, 18, 3]),
-                            'o': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 15, 15, 3]),
-                            'u': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1]),
-                            'u_probability': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1]),
-                            'u_probability_all': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 9]),
-                            'r': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents,  1]),
-                            'o_next': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 15, 15, 3]),
-                            'u_next': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1]),
-                            'terminate': np.empty([self.args.buffer_size, self.args.num_steps, self.args.num_agents, 1])
+                            's': np.empty([self.args.buffer_size, self.args.num_steps_train, 25, 18, 3]),
+                            's_next': np.empty([self.args.buffer_size, self.args.num_steps_train, 25, 18, 3]),
+                            'o': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 15, 15, 3]),
+                            'u': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1]),
+                            'u_probability': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1]),
+                            'u_probability_all': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 9]),
+                            'r': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents,  1]),
+                            'o_next': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 15, 15, 3]),
+                            'u_next': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1]),
+                            'terminate': np.empty([self.args.buffer_size, self.args.num_steps_train, self.args.num_agents, 1])
                             }
         self.actual_length = 0
         self.index = 0
