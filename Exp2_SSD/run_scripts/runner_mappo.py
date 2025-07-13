@@ -64,7 +64,7 @@ class Runner_mappo:
             epsilon = np.min([1, self.args.epsilon_init + (
                         self.args.epsilon_final - self.args.epsilon_init) * epi / self.args.epsilon_steplen])
 
-            while not terminated and step < self.args.num_steps:
+            while not terminated and step < self.args.num_steps_train:
                 o, u, u_probability, r, o_next, terminate = [], [], [], [], [], []
                 actions_dict = {}
                 for i in range(self.args.num_agents):
@@ -115,7 +115,7 @@ class Runner_mappo:
             _, observation = self.env.reset()
             for i in range(self.args.num_agents):
                 observation["agent-" + str(i)] = observation["agent-" + str(i)] / 256
-            for istep in range(self.args.num_steps):
+            for istep in range(self.args.num_steps_evaluate):
                 r = []
                 actions_dict = {}
                 for i in range(self.args.num_agents):

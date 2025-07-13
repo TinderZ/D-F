@@ -120,7 +120,7 @@ class Runner_ppo:
             _, observation = self.env.reset()
             for i in range(self.args.num_agents):
                 observation["agent-" + str(i)] = observation["agent-" + str(i)] / 256
-            for istep in range(self.args.num_steps):
+            for istep in range(self.args.num_steps_evaluate):
                 r = []
                 actions_dict = {}
                 for i in range(self.args.num_agents):

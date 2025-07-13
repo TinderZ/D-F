@@ -7,6 +7,10 @@ class RolloutWorker:
         print('Init RolloutWorker')
 
     def generate_episode(self, episode_num, evaluate=False):
+        if evaluate:
+            max_steps = self.args.num_steps_evaluate
+        else:
+            max_steps = self.args.num_steps_train
         epi_s, epi_s_next, epi_o, epi_u, epi_r, epi_o_next, epi_terminate = [], [], [], [], [], [], []
         state, observation = self.env.reset()
         state = state / 256
@@ -21,7 +25,7 @@ class RolloutWorker:
         else:
             epsilon = np.min([1, self.args.epsilon_init + (self.args.epsilon_final - self.args.epsilon_init) * episode_num / self.args.epsilon_steplen])
 
-        while not terminated and step < self.args.num_steps:
+        while not terminated and step < max_steps:
             o, u, r, o_next, terminate = [], [], [], [], []
             actions_dict = {}
             for i in range(self.args.num_agents):
