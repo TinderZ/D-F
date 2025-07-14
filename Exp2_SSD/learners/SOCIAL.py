@@ -95,12 +95,17 @@ class DQN_SOCIAL():
         return action, action_prob.cpu().numpy()
 
     def KL_divergence(self, p1, p2):
-        kl = torch.zeros((self.args.batch_size, self.args.num_steps_train, 1))
-        if self.args.cuda:
-            kl = kl.cuda()
-        for i in range(p1.shape[2]):
-            kl[:,:,0] += p1[:,:,i]*(torch.log(p1[:,:,i]) - torch.log(p2[:,:,i]))
-        return kl
+        # kl = torch.zeros((self.args.batch_size, self.args.num_steps_train, 1))
+        # if self.args.cuda:
+        #     kl = kl.cuda()
+        # for i in range(p1.shape[2]):
+        #     kl[:,:,0] += p1[:,:,i]*(torch.log(p1[:,:,i]) - torch.log(p2[:,:,i]))
+        # return kl
+        # 避免 log(0) 造成 nan
+        p1 = p1.clamp(min=1e-8)
+        p2 = p2.clamp(min=1e-8)
+        # 使用向量化操作代替 for 循环，提升计算效率
+        return torch.sum(p1 * (torch.log(p1) - torch.log(p2)), dim=2, keepdim=True)
 
     def learn(self, episode_data, agent_id):
         if self.learn_step_counter % self.args.target_update_iter == 0:
@@ -159,10 +164,23 @@ class DQN_SOCIAL():
         loss1 = self.loss_func1(q_eval, q_target)
 
         p_prediction = self.PNet(state, action)
-        loss2 = 0
-        for j_other in range(self.args.num_agents - 1):
-            other_next_action_prob_prediction = p_prediction[:, :, j_other*self.action_num:j_other*self.action_num+self.action_num]
-            loss2 += self.loss_func2(other_next_action_prob_prediction.reshape(self.args.batch_size*self.args.num_steps_train,-1), other_next_action[:, :, j_other, ...].reshape(self.args.batch_size*self.args.num_steps_train))
+        # loss2 = 0
+        # for j_other in range(self.args.num_agents - 1):
+        #     other_next_action_prob_prediction = p_prediction[:, :, j_other*self.action_num:j_other*self.action_num+self.
+        #     action_num]
+        #     loss2 += self.loss_func2(other_next_action_prob_prediction.reshape(self.args.batch_size*self.args.
+        #     num_steps_train,-1), other_next_action[:, :, j_other, ...].reshape(self.args.batch_size*self.args.
+        #     num_steps_train))
+        # 向量化 loss2 的计算，避免 for 循环
+        # 1. 重塑预测张量
+        p_reshaped = p_prediction.view(self.args.batch_size * self.args.num_steps_train, self.args.num_agents - 1, self.action_num)
+        p_reshaped = p_reshaped.view(-1, self.action_num)
+
+        # 2. 重塑目标动作张量
+        target_reshaped = other_next_action.view(-1)
+        
+        # 3. 一次性计算总损失
+        loss2 = self.loss_func2(p_reshaped, target_reshaped)
 
         loss = loss1 + loss2
 
