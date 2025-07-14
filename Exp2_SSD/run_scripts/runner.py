@@ -68,7 +68,7 @@ class Runner:
         self.env = env
         self.args = args
         self.args.action_num = action_num
-        self.episode_rewards = np.empty([self.args.round, self.args.num_agents, int(self.args.num_episodes/self.args.evaluate_cycle)])
+        # self.episode_rewards = np.empty([self.args.round, self.args.num_agents, int(self.args.num_episodes/self.args.evaluate_cycle)])
         self.save_data_path = './data/' + self.args.env + str(self.args.num_agents) + '/' + self.args.algorithm
 
 
@@ -103,7 +103,7 @@ class Runner:
 
         self.rolloutWorker = RolloutWorker(self.env, self.agents, self.args)
         #self.writer = SummaryWriter("~/tf-logs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
-        self.writer = SummaryWriter("./runs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
+        self.writer = SummaryWriter("/root/autodl-tmp/exp_data/" + self.args.env + "/" + self.args.algorithm + "/" + str(num))
 
         train_steps = 0
         cycle_rewards = []
@@ -177,7 +177,7 @@ class Runner:
                     avg_wastes_cleaned = np.mean(cycle_wastes, axis=0)
                 else:
                     avg_wastes_cleaned = np.zeros(self.args.num_agents)
-                self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = avg_individual_reward
+                # self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = avg_individual_reward
 
                 total_reward = np.sum(avg_individual_reward)
                 total_apples_collected = np.sum(avg_apples_collected)
@@ -219,7 +219,7 @@ class Runner:
                 if self.args.env == 'Cleanup':
                     cycle_wastes = []
 
-            np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
+            # np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
 
     # def evaluate(self):
     #     all_rewards = []
