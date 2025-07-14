@@ -135,9 +135,9 @@ class DQN_SOCIAL():
         q_eval = self.eval_net(state).gather(2, action)
         q_next = self.target_net(next_state).detach()
 
+        p_condition_other = self.PNet(state, action)
         for j in range(self.args.num_agents - 1):
             p_other = other_action_prob[:,:,j,...]
-            p_condition_other = self.PNet(state, action)
             p_other_pred = p_condition_other[:, :, j*self.action_num:j*self.action_num+self.action_num]
             r_in = self.KL_divergence(p_other_pred, p_other)
             batch_reward_in = batch_reward_in + r_in
@@ -147,7 +147,7 @@ class DQN_SOCIAL():
         ENV_ALPHA = np.min([self.args.env_alpha_final, self.args.env_alpha_initial + (self.learn_step_counter / self.args.env_alpha_steplen) * (
                                         self.args.env_alpha_final - self.args.env_alpha_initial)])
 
-        reward = reward + (1-ENV_ALPHA) * r_in_scale * batch_reward_in
+        reward = reward + (1-ENV_ALPHA) * r_in_scale * batch_reward_in.detach()
         reward = (reward - reward.mean() ) / (reward.std() + 1e-4)
         if self.args.double_dqn:
             q_target = reward + self.args.gamma * q_next.gather(2, self.eval_net(next_state).max(2)[1].unsqueeze(dim=2)).view(self.args.batch_size, self.args.num_steps_train, 1)
