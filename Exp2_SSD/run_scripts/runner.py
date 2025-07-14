@@ -121,40 +121,40 @@ class Runner:
                     if self.args.algorithm == "QMIX":
                         mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                         loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
+                        self.writer.add_scalar("Agent_Total_Loss", loss.item(), train_steps)
                     elif self.args.algorithm == "QMIX_SHARE":
                         mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                         loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
+                        self.writer.add_scalar("Agent_Total_Loss", loss.item(), train_steps)
                     elif self.args.algorithm == "QMIX_SHARE_STATE":
                         mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                         loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
+                        self.writer.add_scalar("Agent_Total_Loss", loss.item(), train_steps)
                     elif self.args.algorithm == "VDN_SHARE":
                         mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                         loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
+                        self.writer.add_scalar("Agent_Total_Loss", loss.item(), train_steps)
                     elif self.args.algorithm == "VDN_SHARE_STATE":
                         mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                         loss = self.agents.learn(mini_batch)
-                        self.writer.add_scalar("Agent_Total_Loss", loss, train_steps)
+                        self.writer.add_scalar("Agent_Total_Loss", loss.item(), train_steps)
                     elif self.args.algorithm == "MADDPG":
                         mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                         for i in range(self.args.num_agents):
                             closs, aloss = self.agents[i].learn(mini_batch, i, self.agents)
-                            self.writer.add_scalar("Agent_{}_CLoss".format(str(i)), closs, train_steps)
-                            self.writer.add_scalar("Agent_{}_ALoss".format(str(i)), aloss, train_steps)
+                            self.writer.add_scalar("Agent_{}_CLoss".format(str(i)), closs.item(), train_steps)
+                            self.writer.add_scalar("Agent_{}_ALoss".format(str(i)), aloss.item(), train_steps)
                     elif self.args.algorithm == "DDPG":
                         for i in range(self.args.num_agents):
                             mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                             closs, aloss = self.agents[i].learn(mini_batch, i)
-                            self.writer.add_scalar("Agent_{}_CLoss".format(str(i)), closs, train_steps)
-                            self.writer.add_scalar("Agent_{}_ALoss".format(str(i)), aloss, train_steps)
+                            self.writer.add_scalar("Agent_{}_CLoss".format(str(i)), closs.item(), train_steps)
+                            self.writer.add_scalar("Agent_{}_ALoss".format(str(i)), aloss.item(), train_steps)
                     elif self.args.algorithm == "DQN" or self.args.algorithm == "DQN-AVG" or self.args.algorithm == "DQN-MIN" or self.args.algorithm == "DQN-RMF" or self.args.algorithm == "DQN-IA" or self.args.algorithm == "SOCIAL":
                         for i in range(self.args.num_agents):
                             mini_batch = self.buffer.sample(min(self.buffer.__len__(), self.args.batch_size))
                             loss = self.agents[i].learn(mini_batch, i)
-                            self.writer.add_scalar("Agent_{}_Loss".format(str(i)), loss, train_steps)
+                            self.writer.add_scalar("Agent_{}_Loss".format(str(i)), loss.item(), train_steps)
                     else:
                         return None
                     train_steps += 1
