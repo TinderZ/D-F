@@ -106,8 +106,7 @@ else:
 if args.algorithm != "PPO" and args.algorithm != "MAPPO" and args.algorithm != "DF":
     print("Environment: {}, agent-number: {}, algorithm: {}, cuda: {}".format(args.env, args.num_agents, args.algorithm, args.cuda))
     runner = Runner(args)
-    for i in range(args.round):
-        runner.run(i)
+    runner.run(args.round)
 
 if args.algorithm == "PPO":
     args.actor_lr = 5e-4
@@ -122,8 +121,7 @@ if args.algorithm == "PPO":
     print("Initialized: PPO")
     print("Environment: {}, agent-number: {}, algorithm: {}, cuda: {}".format(args.env, args.num_agents, args.algorithm, args.cuda))
     runner = Runner_ppo(args)
-    for i in range(args.round):
-        runner.run(i)
+    runner.run(args.round)
 
 if args.algorithm == "MAPPO":
     args.actor_lr = 5e-4
@@ -138,8 +136,7 @@ if args.algorithm == "MAPPO":
     print("Initialized: MAPPO")
     print("Environment: {}, agent-number: {}, algorithm: {}, cuda: {}".format(args.env, args.num_agents, args.algorithm, args.cuda))
     runner = Runner_mappo(args)
-    for i in range(args.round):
-        runner.run(i)
+    runner.run(args.round)
 
 if args.algorithm == "DF":
     args.gamma = 0.95
@@ -159,5 +156,4 @@ if args.algorithm == "DF":
     print("Initialized: DF")
     print("Environment: {}, agent-number: {}, algorithm: {}, cuda: {}".format(args.env, args.num_agents, args.algorithm, args.cuda))
     runner = Runner_df(args)
-    for i in range(args.round):
-        runner.run(i)
+    runner.run(args.round)

@@ -106,11 +106,24 @@ class Runner:
         self.writer = SummaryWriter("./runs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
 
         train_steps = 0
+        cycle_rewards = []
+        cycle_apples = []
+        cycle_wastes = [] if self.args.env == 'Cleanup' else None
+
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
 
             # The return values of generate_episode are: episode_data, episode_reward, episode_apples_collected, episode_waste_cleaned
-            episode_data, episode_reward, episode_apples_collected, _ = self.rolloutWorker.generate_episode(epi)
+            rollout_returns = self.rolloutWorker.generate_episode(epi)
+            episode_data, episode_reward, episode_apples_collected = rollout_returns[0], rollout_returns[1], rollout_returns[2]
+            if self.args.env == 'Cleanup':
+                episode_wastes_cleaned = rollout_returns[3]
+                cycle_wastes.append(episode_wastes_cleaned)
+
+
+            cycle_rewards.append(episode_reward)
+            cycle_apples.append(episode_apples_collected)
+            
             train_total_reward = np.sum(episode_reward)
             print(f"training episode {epi} (non-eval), total_reward {train_total_reward}, individual_rewards {episode_reward}, individual_apples{episode_apples_collected}")
             self.buffer.add(episode_data)
@@ -157,60 +170,75 @@ class Runner:
                         return None
                     train_steps += 1
             
-            if epi % self.args.evaluate_cycle == 0:
-                avg_individual_reward, avg_apples_collected, avg_wastes_cleaned = self.evaluate()
+            if (epi + 1) % self.args.evaluate_cycle == 0:
+                avg_individual_reward = np.mean(cycle_rewards, axis=0)
+                avg_apples_collected = np.mean(cycle_apples, axis=0)
+                if self.args.env == 'Cleanup':
+                    avg_wastes_cleaned = np.mean(cycle_wastes, axis=0)
+                else:
+                    avg_wastes_cleaned = np.zeros(self.args.num_agents)
                 self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = avg_individual_reward
 
                 total_reward = np.sum(avg_individual_reward)
                 total_apples_collected = np.sum(avg_apples_collected)
-                total_wastes_cleaned = np.sum(avg_wastes_cleaned)
+                if self.args.env == 'Cleanup':
+                    total_wastes_cleaned = np.sum(avg_wastes_cleaned)
 
                 apples_variance = np.var(avg_apples_collected)
                 apples_std_dev = np.std(avg_apples_collected)
                 apples_gini = calculate_gini(avg_apples_collected)
 
-                wastes_variance = np.var(avg_wastes_cleaned)
-                wastes_std_dev = np.std(avg_wastes_cleaned)
-                wastes_gini = calculate_gini(avg_wastes_cleaned)
+                if self.args.env == 'Cleanup':
+                    wastes_variance = np.var(avg_wastes_cleaned)
+                    wastes_std_dev = np.std(avg_wastes_cleaned)
+                    wastes_gini = calculate_gini(avg_wastes_cleaned)
 
                 for i in range(self.args.num_agents):
                     self.writer.add_scalar(f"Agent_{i}_reward", avg_individual_reward[i], epi)
                     self.writer.add_scalar(f"Agent_{i}_apples_collected", avg_apples_collected[i], epi)
-                    self.writer.add_scalar(f"Agent_{i}_wastes_cleaned", avg_wastes_cleaned[i], epi)
+                    if self.args.env == 'Cleanup':
+                        self.writer.add_scalar(f"Agent_{i}_wastes_cleaned", avg_wastes_cleaned[i], epi)
 
                 self.writer.add_scalar("Total_reward", total_reward, epi)
                 self.writer.add_scalar("Total_apples_collected", total_apples_collected, epi)
-                self.writer.add_scalar("Total_wastes_cleaned", total_wastes_cleaned, epi)
+                if self.args.env == 'Cleanup':
+                    self.writer.add_scalar("Total_wastes_cleaned", total_wastes_cleaned, epi)
 
                 self.writer.add_scalar("Apples_Variance", apples_variance, epi)
                 self.writer.add_scalar("Apples_StdDev", apples_std_dev, epi)
                 self.writer.add_scalar("Apples_Gini", apples_gini, epi)
 
-                self.writer.add_scalar("Wastes_Variance", wastes_variance, epi)
-                self.writer.add_scalar("Wastes_StdDev", wastes_std_dev, epi)
-                self.writer.add_scalar("Wastes_Gini", wastes_gini, epi)
+                if self.args.env == 'Cleanup':
+                    self.writer.add_scalar("Wastes_Variance", wastes_variance, epi)
+                    self.writer.add_scalar("Wastes_StdDev", wastes_std_dev, epi)
+                    self.writer.add_scalar("Wastes_Gini", wastes_gini, epi)
                 print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, individual_apples{avg_apples_collected}, algorithm {self.args.algorithm}")
+                
+                cycle_rewards = []
+                cycle_apples = []
+                if self.args.env == 'Cleanup':
+                    cycle_wastes = []
 
             np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
 
-    def evaluate(self):
-        all_rewards = []
-        all_apples = []
-        all_wastes = []
-        for epi in range(self.args.evaluate_epi):
-            # The return values of generate_episode are different for different algorithms.
-            # For SOCIAL, it returns: episode, episode_reward, episode_apples_collected, episode_waste_cleaned
-            # For others, it might return: episode, episode_reward, win_tag, episode_apples, episode_waste
-            # We handle this by checking the length of the returned tuple.
-            # According to the check, all rollout workers return 4 values.
-            _, episode_reward, episode_apples, episode_waste = self.rolloutWorker.generate_episode(epi, evaluate=True)
+    # def evaluate(self):
+    #     all_rewards = []
+    #     all_apples = []
+    #     all_wastes = []
+    #     for epi in range(self.args.evaluate_epi):
+    #         # The return values of generate_episode are different for different algorithms.
+    #         # For SOCIAL, it returns: episode, episode_reward, episode_apples_collected, episode_waste_cleaned
+    #         # For others, it might return: episode, episode_reward, win_tag, episode_apples, episode_waste
+    #         # We handle this by checking the length of the returned tuple.
+    #         # According to the check, all rollout workers return 4 values.
+    #         _, episode_reward, episode_apples, episode_waste = self.rolloutWorker.generate_episode(epi, evaluate=True)
 
-            all_rewards.append(episode_reward)
-            all_apples.append(episode_apples)
-            all_wastes.append(episode_waste)
+    #         all_rewards.append(episode_reward)
+    #         all_apples.append(episode_apples)
+    #         all_wastes.append(episode_waste)
         
-        # 返回每个agent在所有episodes中的平均值
-        return np.mean(all_rewards, axis=0), np.mean(all_apples, axis=0), np.mean(all_wastes, axis=0)
+    #     # 返回每个agent在所有episodes中的平均值
+    #     return np.mean(all_rewards, axis=0), np.mean(all_apples, axis=0), np.mean(all_wastes, axis=0)
 
 
 
