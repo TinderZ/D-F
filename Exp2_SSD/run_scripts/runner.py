@@ -140,10 +140,12 @@ class Runner:
                 self.writer.add_scalar("Wastes_Variance", wastes_variance, epi)
                 self.writer.add_scalar("Wastes_StdDev", wastes_std_dev, epi)
                 self.writer.add_scalar("Wastes_Gini", wastes_gini, epi)
-                print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, algorithm {self.args.algorithm}")
+                print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, individual_apples{avg_apples_collected}, algorithm {self.args.algorithm}")
 
-            # Since different rollout workers might return different number of values, we just get the first one.
-            episode_data = self.rolloutWorker.generate_episode(epi)[0]
+            # The return values of generate_episode are: episode_data, episode_reward, episode_apples_collected, episode_waste_cleaned
+            episode_data, episode_reward, episode_apples_collected, _ = self.rolloutWorker.generate_episode(epi)
+            train_total_reward = np.sum(episode_reward)
+            print(f"training episode {epi} (non-eval), total_reward {train_total_reward}, individual_rewards {episode_reward}, individual_apples{episode_apples_collected}")
             self.buffer.add(episode_data)
             if self.args.batch_size < self.buffer.__len__():
                 for train_step in range(self.args.train_steps):
@@ -198,11 +200,8 @@ class Runner:
             # For SOCIAL, it returns: episode, episode_reward, episode_apples_collected, episode_waste_cleaned
             # For others, it might return: episode, episode_reward, win_tag, episode_apples, episode_waste
             # We handle this by checking the length of the returned tuple.
-            results = self.rolloutWorker.generate_episode(epi, evaluate=True)
-            if len(results) == 5:
-                _, episode_reward, _, episode_apples, episode_waste = results
-            else:
-                _, episode_reward, episode_apples, episode_waste = results
+            # According to the check, all rollout workers return 4 values.
+            _, episode_reward, episode_apples, episode_waste = self.rolloutWorker.generate_episode(epi, evaluate=True)
 
             all_rewards.append(episode_reward)
             all_apples.append(episode_apples)
