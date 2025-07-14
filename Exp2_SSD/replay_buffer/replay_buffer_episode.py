@@ -62,6 +62,8 @@ class ReplayBuffer(object):
             self._storage['terminate'][self.index] = np.expand_dims(np.array(episode_data['terminate']), axis=2)
         if "u_next" in episode_data.keys():
             self._storage['u_next'][self.index] = np.expand_dims(np.array(episode_data['u_next']), axis=2)
+        if "u_probability_all" in episode_data.keys():
+            self._storage['u_probability_all'][self.index] = np.array(episode_data['u_probability_all'])
         if "u_probability" in episode_data.keys():
             self._storage['u_probability'][self.index] = np.expand_dims(np.array(episode_data['u_probability']), axis=2)
         self.index = (self.index + 1) % self.args.buffer_size
