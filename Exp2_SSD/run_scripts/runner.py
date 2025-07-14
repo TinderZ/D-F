@@ -108,39 +108,6 @@ class Runner:
         train_steps = 0
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
-            if epi % self.args.evaluate_cycle == 0:
-                avg_individual_reward, avg_apples_collected, avg_wastes_cleaned = self.evaluate()
-                self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = avg_individual_reward
-
-                total_reward = np.sum(avg_individual_reward)
-                total_apples_collected = np.sum(avg_apples_collected)
-                total_wastes_cleaned = np.sum(avg_wastes_cleaned)
-
-                apples_variance = np.var(avg_apples_collected)
-                apples_std_dev = np.std(avg_apples_collected)
-                apples_gini = calculate_gini(avg_apples_collected)
-
-                wastes_variance = np.var(avg_wastes_cleaned)
-                wastes_std_dev = np.std(avg_wastes_cleaned)
-                wastes_gini = calculate_gini(avg_wastes_cleaned)
-
-                for i in range(self.args.num_agents):
-                    self.writer.add_scalar(f"Agent_{i}_reward", avg_individual_reward[i], epi)
-                    self.writer.add_scalar(f"Agent_{i}_apples_collected", avg_apples_collected[i], epi)
-                    self.writer.add_scalar(f"Agent_{i}_wastes_cleaned", avg_wastes_cleaned[i], epi)
-
-                self.writer.add_scalar("Total_reward", total_reward, epi)
-                self.writer.add_scalar("Total_apples_collected", total_apples_collected, epi)
-                self.writer.add_scalar("Total_wastes_cleaned", total_wastes_cleaned, epi)
-
-                self.writer.add_scalar("Apples_Variance", apples_variance, epi)
-                self.writer.add_scalar("Apples_StdDev", apples_std_dev, epi)
-                self.writer.add_scalar("Apples_Gini", apples_gini, epi)
-
-                self.writer.add_scalar("Wastes_Variance", wastes_variance, epi)
-                self.writer.add_scalar("Wastes_StdDev", wastes_std_dev, epi)
-                self.writer.add_scalar("Wastes_Gini", wastes_gini, epi)
-                print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, individual_apples{avg_apples_collected}, algorithm {self.args.algorithm}")
 
             # The return values of generate_episode are: episode_data, episode_reward, episode_apples_collected, episode_waste_cleaned
             episode_data, episode_reward, episode_apples_collected, _ = self.rolloutWorker.generate_episode(epi)
@@ -189,6 +156,41 @@ class Runner:
                     else:
                         return None
                     train_steps += 1
+            
+            if epi % self.args.evaluate_cycle == 0:
+                avg_individual_reward, avg_apples_collected, avg_wastes_cleaned = self.evaluate()
+                self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = avg_individual_reward
+
+                total_reward = np.sum(avg_individual_reward)
+                total_apples_collected = np.sum(avg_apples_collected)
+                total_wastes_cleaned = np.sum(avg_wastes_cleaned)
+
+                apples_variance = np.var(avg_apples_collected)
+                apples_std_dev = np.std(avg_apples_collected)
+                apples_gini = calculate_gini(avg_apples_collected)
+
+                wastes_variance = np.var(avg_wastes_cleaned)
+                wastes_std_dev = np.std(avg_wastes_cleaned)
+                wastes_gini = calculate_gini(avg_wastes_cleaned)
+
+                for i in range(self.args.num_agents):
+                    self.writer.add_scalar(f"Agent_{i}_reward", avg_individual_reward[i], epi)
+                    self.writer.add_scalar(f"Agent_{i}_apples_collected", avg_apples_collected[i], epi)
+                    self.writer.add_scalar(f"Agent_{i}_wastes_cleaned", avg_wastes_cleaned[i], epi)
+
+                self.writer.add_scalar("Total_reward", total_reward, epi)
+                self.writer.add_scalar("Total_apples_collected", total_apples_collected, epi)
+                self.writer.add_scalar("Total_wastes_cleaned", total_wastes_cleaned, epi)
+
+                self.writer.add_scalar("Apples_Variance", apples_variance, epi)
+                self.writer.add_scalar("Apples_StdDev", apples_std_dev, epi)
+                self.writer.add_scalar("Apples_Gini", apples_gini, epi)
+
+                self.writer.add_scalar("Wastes_Variance", wastes_variance, epi)
+                self.writer.add_scalar("Wastes_StdDev", wastes_std_dev, epi)
+                self.writer.add_scalar("Wastes_Gini", wastes_gini, epi)
+                print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, individual_apples{avg_apples_collected}, algorithm {self.args.algorithm}")
+
             np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
 
     def evaluate(self):
