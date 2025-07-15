@@ -111,3 +111,36 @@ def pad_matrix(left_pad, right_pad, top_pad, bot_pad, matrix, const_val=1):
     pad_mat = np.pad(matrix, ((left_pad, right_pad), (top_pad, bot_pad)),
                      'constant', constant_values=(const_val, const_val))
     return pad_mat
+
+
+def _calculate_gini(values_list):
+    """Helper to calculate Gini coefficient."""
+    values = np.array(values_list, dtype=np.float64)
+    if values.size == 0 or np.mean(values) == 0:
+        return 0.0
+
+    n = len(values)
+    if n <= 1:
+        return 0.0
+
+    sum_abs_diff = np.sum(np.abs(values - values[:, np.newaxis]))
+    denominator = 2 * n**2 * np.mean(values)
+    if denominator == 0:
+        return 0.0
+    return sum_abs_diff / denominator
+
+
+def get_fairness_metrics(values_list):
+    """
+    Calculates variance, standard deviation, and Gini coefficient for a list of values.
+    """
+    if not isinstance(values_list, (list, np.ndarray)):
+        return 0.0, 0.0, 0.0
+    
+    values = np.array(values_list)
+
+    variance = np.var(values)
+    std_dev = np.std(values)
+    gini = _calculate_gini(values)
+
+    return variance, std_dev, gini

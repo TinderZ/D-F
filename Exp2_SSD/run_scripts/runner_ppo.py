@@ -17,7 +17,7 @@ from learners.QMIX_SHARE import QMIX_SHARE
 from learners.MAPPO import MAPPO
 from tqdm import tqdm
 import collections
-from utility_funcs import get_social_metrics
+from utility_funcs import get_fairness_metrics
 
 def make_env(args):
     if args.env == "Harvest":
@@ -124,7 +124,7 @@ class Runner_ppo:
 
                 if self.args.env == "Harvest":
                     train_apples_collected_list = [np.mean(train_infos[f'Train_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
-                    variance, std_dev, gini = get_social_metrics(train_apples_collected_list)
+                    variance, std_dev, gini = get_fairness_metrics(train_apples_collected_list)
                     self.writer.add_scalar("Train_Apples_Variance", variance, train_steps)
                     self.writer.add_scalar("Train_Apples_StdDev", std_dev, train_steps)
                     self.writer.add_scalar("Train_Apples_Gini", gini, train_steps)
@@ -132,11 +132,11 @@ class Runner_ppo:
                 elif self.args.env == 'Cleanup':
                     train_apples_collected_list = [np.mean(train_infos[f'Train_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
                     train_wastes_cleaned_list = [np.mean(train_infos[f'Train_infos/agent-{i}/wastes_cleaned']) for i in range(num_agents)]
-                    variance, std_dev, gini = get_social_metrics(train_apples_collected_list)
+                    variance, std_dev, gini = get_fairness_metrics(train_apples_collected_list)
                     self.writer.add_scalar("Train_Apples_Variance", variance, train_steps)
                     self.writer.add_scalar("Train_Apples_StdDev", std_dev, train_steps)
                     self.writer.add_scalar("Train_Apples_Gini", gini, train_steps)
-                    variance, std_dev, gini = get_social_metrics(train_wastes_cleaned_list)
+                    variance, std_dev, gini = get_fairness_metrics(train_wastes_cleaned_list)
                     self.writer.add_scalar("Train_Wastes_Variance", variance, train_steps)
                     self.writer.add_scalar("Train_Wastes_StdDev", std_dev, train_steps)
                     self.writer.add_scalar("Train_Wastes_Gini", gini, train_steps)
@@ -172,7 +172,7 @@ class Runner_ppo:
 
                 if self.args.env == "Harvest":
                     eval_apples_collected_list = [np.sum(eval_infos[f'eval_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
-                    variance, std_dev, gini = get_social_metrics(eval_apples_collected_list)
+                    variance, std_dev, gini = get_fairness_metrics(eval_apples_collected_list)
                     self.writer.add_scalar("eval_Apples_Variance", variance, train_steps)
                     self.writer.add_scalar("eval_Apples_StdDev", std_dev, train_steps)
                     self.writer.add_scalar("eval_Apples_Gini", gini, train_steps)
@@ -180,11 +180,11 @@ class Runner_ppo:
                 elif self.args.env == 'Cleanup':
                     eval_apples_collected_list = [np.sum(eval_infos[f'eval_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
                     eval_wastes_cleaned_list = [np.sum(eval_infos[f'eval_infos/agent-{i}/wastes_cleaned']) for i in range(num_agents)]
-                    variance, std_dev, gini = get_social_metrics(eval_apples_collected_list)
+                    variance, std_dev, gini = get_fairness_metrics(eval_apples_collected_list)
                     self.writer.add_scalar("eval_Apples_Variance", variance, train_steps)
                     self.writer.add_scalar("eval_Apples_StdDev", std_dev, train_steps)
                     self.writer.add_scalar("eval_Apples_Gini", gini, train_steps)
-                    variance, std_dev, gini = get_social_metrics(eval_wastes_cleaned_list)
+                    variance, std_dev, gini = get_fairness_metrics(eval_wastes_cleaned_list)
                     self.writer.add_scalar("eval_Wastes_Variance", variance, train_steps)
                     self.writer.add_scalar("eval_Wastes_StdDev", std_dev, train_steps)
                     self.writer.add_scalar("eval_Wastes_Gini", gini, train_steps)

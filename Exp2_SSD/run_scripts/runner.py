@@ -16,30 +16,7 @@ from learners.MADDPG import MADDPG
 from learners.QMIX_SHARE import QMIX_SHARE
 from learners.MAPPO import MAPPO
 from tqdm import tqdm
-
-def calculate_gini(values_list):
-    if not isinstance(values_list, list) and not isinstance(values_list, np.ndarray):
-        return 0.0
-    
-    values = np.array(values_list, dtype=np.float64)
-    
-    if len(values) == 0:
-        return 0.0
-
-    mean_val = np.mean(values)
-
-    if mean_val == 0:
-        return 0.0
-
-    n = len(values)
-    if n <= 1:
-        return 0.0
-        
-    sum_abs_diff = np.sum(np.abs(values - values[:, np.newaxis]))
-    denominator = 2 * n**2 * mean_val
-    if denominator == 0:
-        return 0.0
-    return sum_abs_diff / denominator
+from utility_funcs import get_fairness_metrics
 
 def make_env(args):
     if args.env == "Harvest":
@@ -173,14 +150,10 @@ class Runner:
                 if self.args.env == 'Cleanup':
                     total_wastes_cleaned = np.sum(avg_wastes_cleaned)
 
-                apples_variance = np.var(avg_apples_collected)
-                apples_std_dev = np.std(avg_apples_collected)
-                apples_gini = calculate_gini(avg_apples_collected)
+                apples_variance, apples_std_dev, apples_gini = get_fairness_metrics(avg_apples_collected)
 
                 if self.args.env == 'Cleanup':
-                    wastes_variance = np.var(avg_wastes_cleaned)
-                    wastes_std_dev = np.std(avg_wastes_cleaned)
-                    wastes_gini = calculate_gini(avg_wastes_cleaned)
+                    wastes_variance, wastes_std_dev, wastes_gini = get_fairness_metrics(avg_wastes_cleaned)
 
                 for i in range(self.args.num_agents):
                     self.writer.add_scalar(f"Agent_{i}_reward", avg_individual_reward[i], epi)
@@ -210,14 +183,10 @@ class Runner:
                 if self.args.env == 'Cleanup':
                     eval_total_wastes_cleaned = np.sum(eval_avg_wastes_cleaned)
 
-                eval_apples_variance = np.var(eval_avg_apples_collected)
-                eval_apples_std_dev = np.std(eval_avg_apples_collected)
-                eval_apples_gini = calculate_gini(eval_avg_apples_collected)
+                eval_apples_variance, eval_apples_std_dev, eval_apples_gini = get_fairness_metrics(eval_avg_apples_collected)
 
                 if self.args.env == 'Cleanup':
-                    eval_wastes_variance = np.var(eval_avg_wastes_cleaned)
-                    eval_wastes_std_dev = np.std(eval_avg_wastes_cleaned)
-                    eval_wastes_gini = calculate_gini(eval_avg_wastes_cleaned)
+                    eval_wastes_variance, eval_wastes_std_dev, eval_wastes_gini = get_fairness_metrics(eval_avg_wastes_cleaned)
 
                 for i in range(self.args.num_agents):
                     self.writer.add_scalar(f"eval_Agent_{i}_reward", eval_avg_individual_reward[i], epi)
