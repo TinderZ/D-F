@@ -181,7 +181,7 @@ class MapEnv(MultiAgentEnv):
                 info[agent.agent_id]['apples_collected'] = apple_consumed
 
         # execute custom moves like firing
-        self.update_custom_moves(agent_actions, info)
+        self.update_custom_moves(agent_actions, info) # waste 的指标在这个函数中
 
         # execute spawning events
         self.custom_map_update()
