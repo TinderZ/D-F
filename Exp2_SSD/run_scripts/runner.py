@@ -208,7 +208,7 @@ class Runner:
                     self.writer.add_scalar("eval_Wastes_StdDev", eval_wastes_std_dev, epi)
                     self.writer.add_scalar("eval_Wastes_Gini", eval_wastes_gini, epi)
                 
-                print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, individual_apples{avg_apples_collected}, algorithm {self.args.algorithm}")
+                print(f"evaluation episode {epi}, eval_total_reward {eval_total_reward}, eval_individual_rewards {eval_avg_individual_reward}, eval_individual_apples{eval_avg_apples_collected}, algorithm {self.args.algorithm}")
                 
                 
                 cycle_rewards = []
