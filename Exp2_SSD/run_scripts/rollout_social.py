@@ -22,7 +22,7 @@ class RolloutWorker:
         episode_waste_cleaned = np.zeros(self.args.num_agents)  # 新增: 为waste数创建一个累加器
         # epsilon
         if evaluate:
-            epsilon = 0
+            epsilon = 1
         else:
             epsilon = np.min([1, self.args.epsilon_init + (self.args.epsilon_final - self.args.epsilon_init) * episode_num / self.args.epsilon_steplen])
 
