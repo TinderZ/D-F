@@ -56,12 +56,15 @@ class MAPPO():
         return int(action), action_logprob
 
     def learn(self, episode_data):
-        batch_observation = torch.from_numpy(np.array(episode_data['o'])).float()
-        batch_state = torch.from_numpy(np.array(episode_data['s'])).float()
-        batch_action = torch.from_numpy(np.array(episode_data['u'])).long()
-        batch_action_prob = torch.from_numpy(np.array(episode_data['u_probability'])).float()
-        batch_reward = torch.from_numpy(np.array(episode_data['r'])).float()
-        batch_state_next = torch.from_numpy(np.array(episode_data['s_next'])).float()
+        # --- 修改代码块开始 ---
+        # 为所有从 episode 加载的数据统一增加一个 batch 维度 (batch_size=1)
+        batch_observation = torch.from_numpy(np.array(episode_data['o'])).float().unsqueeze(0)
+        batch_state = torch.from_numpy(np.array(episode_data['s'])).float().unsqueeze(0)
+        batch_action = torch.from_numpy(np.array(episode_data['u'])).long().unsqueeze(0)
+        batch_action_prob = torch.from_numpy(np.array(episode_data['u_probability'])).float().unsqueeze(0)
+        batch_reward = torch.from_numpy(np.array(episode_data['r'])).float().unsqueeze(0)
+        batch_state_next = torch.from_numpy(np.array(episode_data['s_next'])).float().unsqueeze(0)
+        # --- 修改代码块结束 ---
         if self.args.cuda:
             batch_observation = batch_observation.cuda()
             batch_state = batch_state.cuda()
@@ -78,9 +81,16 @@ class MAPPO():
             batch_return = batch_return.cuda()
         for step in range(self.args.num_steps_train - 1, -1, -1):
             if step == self.args.num_steps_train - 1:
-                batch_return[:, step, ...] = batch_reward[:, step, 0, ...].unsqueeze(-1)
+                # --- 
+                # 原: batch_return[:, step, ...] = batch_reward[:, step, 0, ...].unsqueeze(-1)
+                # 新: 使用所有智能体的平均奖励来计算回报
+                batch_return[:, step, ...] = batch_reward[:, step, :].mean(dim=-1, keepdim=True)
+                # --- 
             if step < self.args.num_steps_train - 1:
-                batch_return[:, step, ...] = batch_reward[:, step, 0, ...].unsqueeze(-1) + self.args.gamma * batch_return[:, step + 1, ...]
+                # --- -
+                # 使用所有智能体的平均奖励来计算回报
+                batch_return[:, step, ...] = batch_reward[:, step, :].mean(dim=-1, keepdim=True) + self.args.gamma * batch_return[:, step + 1, ...]
+                # --- 
         batch_return = (batch_return - batch_return.mean()) / (batch_return.std() + 1e-5)
         V = self.critic_net(batch_state)
         advantage = (batch_return - V).detach()
@@ -91,13 +101,16 @@ class MAPPO():
             value_loss = F.mse_loss(batch_return, V)
             actor_loss = 0
             for agent_id in range(self.args.num_agents):
+                # --- 
+                # 调整索引以适应新的 batch 维度
                 action_probs = self.actor_net(batch_observation[:, :, agent_id, ...]) # new policy
                 action_probs = action_probs.reshape(-1, self.action_num)
                 dist = Categorical(action_probs)
                 action_prob = dist.log_prob(batch_action[:, :, agent_id, ...].reshape(-1))
                 action_prob = action_prob.reshape(self.args.num_steps_train, -1).squeeze(-1)
 
-                ratio = torch.exp(action_prob - batch_action_prob[:, :, agent_id, ...]).unsqueeze(dim=-1)
+                ratio = torch.exp(action_prob - batch_action_prob[:, :, agent_id, ...].squeeze(0)).unsqueeze(dim=-1)
+                # --- 
                 surr1 = ratio * advantage
                 surr2 = torch.clamp(ratio, 1 - self.args.clip_param, 1 + self.args.clip_param) * advantage
                 actor_loss += -torch.min(surr1, surr2).mean()
