@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ray.rllib.env import MultiAgentEnv
 
+from social_dilemmas.constants import APPLE_RESPAWN_COOLDOWN
+
 ACTIONS = {'MOVE_LEFT': [-1, 0],  # Move left
            'MOVE_RIGHT': [1, 0],  # Move right
            'MOVE_UP': [0, -1],  # Move up
@@ -175,10 +177,10 @@ class MapEnv(MultiAgentEnv):
 
         for agent in self.agents.values():
             pos = agent.get_pos()
-            new_char, apple_consumed = agent.consume(self.world_map[pos[0], pos[1]])
+            if self.world_map[pos[0], pos[1]] == 'A':
+                self.apple_cooldowns[tuple(pos)] = APPLE_RESPAWN_COOLDOWN
+            new_char = agent.consume(self.world_map[pos[0], pos[1]])
             self.world_map[pos[0], pos[1]] = new_char
-            if apple_consumed > 0:
-                info[agent.agent_id]['apples_collected'] = apple_consumed
 
         # execute custom moves like firing
         self.update_custom_moves(agent_actions, info) # waste 的指标在这个函数中

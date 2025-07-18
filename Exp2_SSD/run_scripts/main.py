@@ -3,6 +3,9 @@ import pandas as pd
 import argparse
 import sys
 sys.path.append('./')
+import sys
+sys.path.append('./')
+
 import torch
 from run_scripts.runner import Runner
 from run_scripts.runner_ppo import Runner_ppo

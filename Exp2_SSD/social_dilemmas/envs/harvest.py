@@ -21,6 +21,7 @@ class HarvestEnv(MapEnv):
             for col in range(self.base_map.shape[1]):
                 if self.base_map[row, col] == 'A':
                     self.apple_points.append([row, col])
+        self.apple_cooldowns = {}
 
     @property
     def action_space(self):
@@ -48,6 +49,7 @@ class HarvestEnv(MapEnv):
 
     def custom_reset(self):
         """Initialize the walls and the apples"""
+        self.apple_cooldowns = {}
         for apple_point in self.apple_points:
             self.world_map[apple_point[0], apple_point[1]] = 'A'
 
@@ -64,6 +66,11 @@ class HarvestEnv(MapEnv):
         new_apples = self.spawn_apples()
         self.update_map(new_apples)
 
+        # handle cooldowns
+        for pos, cooldown in self.apple_cooldowns.items():
+            self.apple_cooldowns[pos] -= 1
+        self.apple_cooldowns = {pos: cooldown for pos, cooldown in self.apple_cooldowns.items() if cooldown > 0}
+
     def spawn_apples(self):
         """Construct the apples spawned in this step.
 
@@ -77,7 +84,7 @@ class HarvestEnv(MapEnv):
         for i in range(len(self.apple_points)):
             row, col = self.apple_points[i]
             # apples can't spawn where agents are standing or where an apple already is
-            if [row, col] not in self.agent_pos and self.world_map[row, col] != 'A':
+            if [row, col] not in self.agent_pos and self.world_map[row, col] != 'A' and (row, col) not in self.apple_cooldowns:
                 num_apples = 0
                 for j in range(-APPLE_RADIUS, APPLE_RADIUS + 1):
                     for k in range(-APPLE_RADIUS, APPLE_RADIUS + 1):

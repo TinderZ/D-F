@@ -48,3 +48,5 @@ CLEANUP_MAP = [
     '@RRRRR       BBBB@',
     '@HHHH       BBBBB@',
     '@@@@@@@@@@@@@@@@@@']
+
+APPLE_RESPAWN_COOLDOWN = 50
