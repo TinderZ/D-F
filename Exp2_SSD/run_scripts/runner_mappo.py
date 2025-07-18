@@ -45,7 +45,7 @@ class Runner_mappo:
         train_steps = 0
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
-            self.agents.init_hidden()
+            # self.agents.init_hidden()
             epi_s, epi_s_next, epi_o, epi_u, epi_u_probability, epi_r, epi_o_next, epi_terminate = [], [], [], [], [], [], [], []
             train_infos = collections.defaultdict(list)
             state, observation = self.env.reset()

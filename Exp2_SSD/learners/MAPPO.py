@@ -34,10 +34,6 @@ class MAPPO():
             self.old_actor_net.cuda()
             self.critic_net.cuda()
 
-    def init_hidden(self):
-        self.h0 = [torch.randn(1, 1, 32) for _ in range(self.args.num_agents)]
-        self.c0 = [torch.randn(1, 1, 32) for _ in range(self.args.num_agents)]
-
     def choose_action(self, obs, episolon, agent_id):
         obsnp = np.array(obs)
         obs = torch.from_numpy(obsnp.copy()).unsqueeze(dim=0)
@@ -45,16 +41,13 @@ class MAPPO():
         if self.args.cuda:
             obs = obs.cuda()
         with torch.no_grad():
-            if self.args.cuda:
-                self.h0[agent_id] = self.h0[agent_id].cuda()
-                self.c0[agent_id] = self.c0[agent_id].cuda()
-            action_prob, self.h0[agent_id], self.c0[agent_id] = self.old_actor_net(obs, self.h0[agent_id], self.c0[agent_id])
+            action_prob = self.old_actor_net(obs)
             dist = Categorical(action_prob)
             if np.random.rand() <= episolon:
                 action = dist.sample()
                 action_logprob = dist.log_prob(action)
             else:
-                action = torch.randint(0, self.action_num, (1,))
+                action = torch.randint(0, self.action_num, (1,1))
                 if self.args.cuda:
                     action = action.cuda()
                 action_logprob = dist.log_prob(action)
@@ -67,9 +60,10 @@ class MAPPO():
         batch_state = torch.from_numpy(np.array(episode_data['s'])).float()
         batch_action = torch.from_numpy(np.array(episode_data['u'])).long()
         batch_action_prob = torch.from_numpy(np.array(episode_data['u_probability'])).float()
-        batch_reward = torch.from_numpy(np.array(episode_data['r'])).float().unsqueeze(dim=3)
+        batch_reward = torch.from_numpy(np.array(episode_data['r'])).float()
         batch_state_next = torch.from_numpy(np.array(episode_data['s_next'])).float()
         if self.args.cuda:
+            batch_observation = batch_observation.cuda()
             batch_state = batch_state.cuda()
             batch_action = batch_action.cuda()
             batch_action_prob = batch_action_prob.cuda()
@@ -84,28 +78,32 @@ class MAPPO():
             batch_return = batch_return.cuda()
         for step in range(self.args.num_steps_train - 1, -1, -1):
             if step == self.args.num_steps_train - 1:
-                batch_return[:, step, ...] = batch_reward[:, step, 0, ...]
+                batch_return[:, step, ...] = batch_reward[:, step, 0, ...].unsqueeze(-1)
             if step < self.args.num_steps_train - 1:
-                batch_return[:, step, ...] = batch_reward[:, step, 0, ...] + self.args.gamma * batch_return[:, step + 1, ...]
+                batch_return[:, step, ...] = batch_reward[:, step, 0, ...].unsqueeze(-1) + self.args.gamma * batch_return[:, step + 1, ...]
         batch_return = (batch_return - batch_return.mean()) / (batch_return.std() + 1e-5)
         V = self.critic_net(batch_state)
         advantage = (batch_return - V).detach()
+        total_value_loss = 0
+        total_actor_loss = 0
         for _ in range(self.args.training_times):
             V = self.critic_net(batch_state)
             value_loss = F.mse_loss(batch_return, V)
             actor_loss = 0
             for agent_id in range(self.args.num_agents):
-                action_probs = self.actor_net(batch_observation[:, agent_id, ...]) # new policy
-                action_probs = action_probs.reshape(-1,self.args.action_num)
+                action_probs = self.actor_net(batch_observation[:, :, agent_id, ...]) # new policy
+                action_probs = action_probs.reshape(-1, self.action_num)
                 dist = Categorical(action_probs)
-                action_prob = dist.log_prob(batch_action[:, agent_id, ...].squeeze()).squeeze()
-                ratio = torch.exp(action_prob - batch_action_prob[:, agent_id, ...]).unsqueeze(dim=1)
+                action_prob = dist.log_prob(batch_action[:, :, agent_id, ...].reshape(-1))
+                action_prob = action_prob.reshape(self.args.num_steps_train, -1).squeeze(-1)
+
+                ratio = torch.exp(action_prob - batch_action_prob[:, :, agent_id, ...]).unsqueeze(dim=-1)
                 surr1 = ratio * advantage
                 surr2 = torch.clamp(ratio, 1 - self.args.clip_param, 1 + self.args.clip_param) * advantage
                 actor_loss += -torch.min(surr1, surr2).mean()
             loss = actor_loss + value_loss
-            total_value_loss += value_loss
-            total_actor_loss += actor_loss
+            total_value_loss += value_loss.item()
+            total_actor_loss += actor_loss.item()
             self.optimizer.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(self.critic_net.parameters(), self.args.grad_clip)

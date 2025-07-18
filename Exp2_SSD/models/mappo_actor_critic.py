@@ -14,6 +14,9 @@ class MAPPO_Actor(nn.Module):
         self.fc3 = nn.Linear(32, action_num)
 
     def forward(self, obs):
+        if len(obs.shape) == 4: # choose_action
+            obs = obs.unsqueeze(1)
+        
         batch, step = obs.shape[0], obs.shape[1]
         x = obs.permute(0, 1, 4, 2, 3)
         x = torch.flatten(x, start_dim=0, end_dim=1)
@@ -41,6 +44,8 @@ class MAPPO_Critic(nn.Module):
         self.q_out = nn.Linear(32, 1)
 
     def forward(self, s):
+        if len(s.shape) == 3: # learn
+            s = s.unsqueeze(0)
         Batch, step = s.shape[0], s.shape[1]
         x = s.reshape(Batch, step, -1)
         x = F.leaky_relu(self.fc1(x))
