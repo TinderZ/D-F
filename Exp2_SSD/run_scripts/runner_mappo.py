@@ -8,6 +8,8 @@ from ray.tune.registry import register_env
 from torch.utils.tensorboard import SummaryWriter
 from learners.MAPPO import MAPPO
 from tqdm import tqdm
+import collections
+from utility_funcs import get_fairness_metrics
 
 def make_env(args):
     if args.env == "Harvest":
@@ -36,24 +38,16 @@ class Runner_mappo:
         self.env = env
         self.args = args
         self.args.action_num = action_num
-        self.episode_rewards = np.empty([self.args.round, self.args.num_agents, int(self.args.num_episodes/self.args.evaluate_cycle)])
-        self.save_data_path = './data/' + self.args.env + str(self.args.num_agents) + '/' + self.args.algorithm
-        if not os.path.exists(self.save_data_path):
-            os.makedirs(self.save_data_path)
-        file = sorted(os.listdir(self.save_data_path))
-        if file == []:
-            self.next_num = 1
-        else:
-            self.next_num = int(file[-1].split('.')[0][-1]) + 1
 
     def run(self, num):
         self.agents = MAPPO(self.args, self.args.action_num)
-        self.writer = SummaryWriter("./runs/" + self.args.env + str(self.args.num_agents) + "/" + self.args.algorithm + "/" + str(num))
+        self.writer = SummaryWriter("/root/autodl-tmp/exp_data/" + self.args.env + "/" + self.args.algorithm + "/" + str(num))
         train_steps = 0
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
             self.agents.init_hidden()
             epi_s, epi_s_next, epi_o, epi_u, epi_u_probability, epi_r, epi_o_next, epi_terminate = [], [], [], [], [], [], [], []
+            train_infos = collections.defaultdict(list)
             state, observation = self.env.reset()
             state = state / 256
             for i in range(self.args.num_agents):
@@ -74,6 +68,9 @@ class Runner_mappo:
                     u_probability.append(action_logprobability)
                     actions_dict["agent-" + str(i)] = action
                 state_next, observation_next, reward, dones, infos = self.env.step(actions_dict)
+                for agent_id, info_dict in infos.items():
+                    for k, v in info_dict.items():
+                        train_infos[f"Train_infos/agent-{i}/{k}"].append(v)
                 state_next = state_next / 256
                 for i in range(self.args.num_agents):
                     observation_next["agent-" + str(i)] = observation_next["agent-" + str(i)] / 256
@@ -109,33 +106,81 @@ class Runner_mappo:
                 self.writer.add_scalar("Agent_total_CLoss", closs, train_steps)
                 self.writer.add_scalar("Agent_total_ALoss", aloss, train_steps)
 
+            # --- Log training metrics ---
+            num_agents = self.args.num_agents
+            train_avg_individual_reward = [np.mean(train_infos[f'Train_infos/agent-{i}/reward']) for i in range(num_agents)]
+            train_total_reward = sum(train_avg_individual_reward)
 
-            # evaulate
-            episode_reward = np.zeros(self.args.num_agents)
+            self.writer.add_scalar("Train_Total_reward", train_total_reward, train_steps)
+            for i in range(num_agents):
+                self.writer.add_scalar(f"Train_Agent_{i}_reward", train_avg_individual_reward[i], train_steps)
+
+            if self.args.env == "Harvest":
+                train_apples_collected_list = [np.mean(train_infos[f'Train_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
+                variance, std_dev, gini = get_fairness_metrics(train_apples_collected_list)
+                self.writer.add_scalar("Train_Apples_Variance", variance, train_steps)
+                self.writer.add_scalar("Train_Apples_StdDev", std_dev, train_steps)
+                self.writer.add_scalar("Train_Apples_Gini", gini, train_steps)
+                print(f"training episode {epi}, total_reward {train_total_reward:.2f}, individual_rewards {[round(r, 2) for r in train_avg_individual_reward]}, individual_apples{[round(a, 2) for a in train_apples_collected_list]}")
+            elif self.args.env == 'Cleanup':
+                train_apples_collected_list = [np.mean(train_infos[f'Train_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
+                train_wastes_cleaned_list = [np.mean(train_infos[f'Train_infos/agent-{i}/wastes_cleaned']) for i in range(num_agents)]
+                variance, std_dev, gini = get_fairness_metrics(train_apples_collected_list)
+                self.writer.add_scalar("Train_Apples_Variance", variance, train_steps)
+                self.writer.add_scalar("Train_Apples_StdDev", std_dev, train_steps)
+                self.writer.add_scalar("Train_Apples_Gini", gini, train_steps)
+                variance, std_dev, gini = get_fairness_metrics(train_wastes_cleaned_list)
+                self.writer.add_scalar("Train_Wastes_Variance", variance, train_steps)
+                self.writer.add_scalar("Train_Wastes_StdDev", std_dev, train_steps)
+                self.writer.add_scalar("Train_Wastes_Gini", gini, train_steps)
+                print(f"training episode {epi}, total_reward {train_total_reward:.2f}, individual_rewards {[round(r, 2) for r in train_avg_individual_reward]}, individual_apples{[round(a, 2) for a in train_apples_collected_list]}")
+            
+            # --- Log evaluation metrics (1 episode) ---
+            eval_infos = collections.defaultdict(list)
             _, observation = self.env.reset()
             for i in range(self.args.num_agents):
                 observation["agent-" + str(i)] = observation["agent-" + str(i)] / 256
             for istep in range(self.args.num_steps_evaluate):
-                r = []
                 actions_dict = {}
                 for i in range(self.args.num_agents):
                     action, action_logprobability = self.agents.choose_action(observation["agent-" + str(i)], 1, i)
                     actions_dict["agent-" + str(i)] = action
                 _, observation_next, reward, dones, infos = self.env.step(actions_dict)
+                for agent_id, info_dict in infos.items():
+                    for k, v in info_dict.items():
+                        eval_infos[f"eval_infos/{agent_id}/{k}"].append(v)
                 for i in range(self.args.num_agents):
                     observation_next["agent-" + str(i)] = observation_next["agent-" + str(i)] / 256
-                    r.append(reward["agent-" + str(i)])
                 observation = observation_next
-                episode_reward += np.array(r)
-            self.episode_rewards[num, :, epi] = episode_reward
-            for i in range(self.args.num_agents):
-                self.writer.add_scalar("Agent_{}_reward".format(str(i)), episode_reward[i], epi)
-            self.writer.add_scalar("Total_reward", episode_reward.sum(), epi)
-            print("training episode {}, total_reward {}, algorithm {}, agent_num {}".format(epi, episode_reward.sum(),
-                                                                                            self.args.algorithm,
-                                                                                            self.args.num_agents))
 
-            np.save(self.save_data_path + '/epi_total_reward_{}'.format(str(self.next_num)), self.episode_rewards)
+            # cal social metrics for the single evaluation episode
+            eval_individual_reward = [np.sum(eval_infos[f'eval_infos/agent-{i}/reward']) for i in range(num_agents)]
+            eval_total_reward = sum(eval_individual_reward)
+            self.writer.add_scalar("eval_Total_reward", eval_total_reward, train_steps)
+            for i in range(num_agents):
+                self.writer.add_scalar(f"eval_Agent_{i}_reward", eval_individual_reward[i], train_steps)
+
+            if self.args.env == "Harvest":
+                eval_apples_collected_list = [np.sum(eval_infos[f'eval_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
+                variance, std_dev, gini = get_fairness_metrics(eval_apples_collected_list)
+                self.writer.add_scalar("eval_Apples_Variance", variance, train_steps)
+                self.writer.add_scalar("eval_Apples_StdDev", std_dev, train_steps)
+                self.writer.add_scalar("eval_Apples_Gini", gini, train_steps)
+                print(f"evaluating episode {epi}, total_reward {eval_total_reward:.2f}, individual_rewards {[round(r, 2) for r in eval_individual_reward]}, individual_apples{[round(a, 2) for a in eval_apples_collected_list]}")
+            elif self.args.env == 'Cleanup':
+                eval_apples_collected_list = [np.sum(eval_infos[f'eval_infos/agent-{i}/apples_collected']) for i in range(num_agents)]
+                eval_wastes_cleaned_list = [np.sum(eval_infos[f'eval_infos/agent-{i}/wastes_cleaned']) for i in range(num_agents)]
+                variance, std_dev, gini = get_fairness_metrics(eval_apples_collected_list)
+                self.writer.add_scalar("eval_Apples_Variance", variance, train_steps)
+                self.writer.add_scalar("eval_Apples_StdDev", std_dev, train_steps)
+                self.writer.add_scalar("eval_Apples_Gini", gini, train_steps)
+                variance, std_dev, gini = get_fairness_metrics(eval_wastes_cleaned_list)
+                self.writer.add_scalar("eval_Wastes_Variance", variance, train_steps)
+                self.writer.add_scalar("eval_Wastes_StdDev", std_dev, train_steps)
+                self.writer.add_scalar("eval_Wastes_Gini", gini, train_steps)
+                print(f"evaluating episode {epi}, total_reward {eval_total_reward:.2f}, individual_rewards {[round(r, 2) for r in eval_individual_reward]}, individual_apples{[round(a, 2) for a in eval_apples_collected_list]}")
+
+        self.writer.close()
 
 
 
