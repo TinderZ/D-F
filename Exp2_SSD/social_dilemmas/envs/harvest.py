@@ -9,7 +9,7 @@ APPLE_RADIUS = 2
 # Add custom actions to the agent
 ACTIONS['FIRE'] = 5  # length of firing range
 
-SPAWN_PROB = [0, 0.005, 0.02, 0.05]
+SPAWN_PROB = [0.0, 0.005, 0.01, 0.02, 0.05]#[0, 0.005, 0.02, 0.05]
 
 
 class HarvestEnv(MapEnv):
@@ -71,6 +71,20 @@ class HarvestEnv(MapEnv):
             self.apple_cooldowns[pos] -= 1
         self.apple_cooldowns = {pos: cooldown for pos, cooldown in self.apple_cooldowns.items() if cooldown > 0}
 
+    def _count_nearby_apples(self, pos):
+        """Counts the number of apples in a circle of radius APPLE_RADIUS around a given point."""
+        num_apples = 0
+        x, y = pos
+        for j in range(-APPLE_RADIUS, APPLE_RADIUS + 1):
+            for k in range(-APPLE_RADIUS, APPLE_RADIUS + 1):
+                if j ** 2 + k ** 2 <= APPLE_RADIUS:
+                    if 0 <= x + j < self.world_map.shape[0] and \
+                            self.world_map.shape[1] > y + k >= 0:
+                        symbol = self.world_map[x + j, y + k]
+                        if symbol == 'A':
+                            num_apples += 1
+        return num_apples
+
     def spawn_apples(self):
         """Construct the apples spawned in this step.
 
@@ -85,18 +99,9 @@ class HarvestEnv(MapEnv):
             row, col = self.apple_points[i]
             # apples can't spawn where agents are standing or where an apple already is
             if [row, col] not in self.agent_pos and self.world_map[row, col] != 'A' and (row, col) not in self.apple_cooldowns:
-                num_apples = 0
-                for j in range(-APPLE_RADIUS, APPLE_RADIUS + 1):
-                    for k in range(-APPLE_RADIUS, APPLE_RADIUS + 1):
-                        if j**2 + k**2 <= APPLE_RADIUS:
-                            x, y = self.apple_points[i]
-                            if 0 <= x + j < self.world_map.shape[0] and \
-                                    self.world_map.shape[1] > y + k >= 0:
-                                symbol = self.world_map[x + j, y + k]
-                                if symbol == 'A':
-                                    num_apples += 1
+                num_apples = self._count_nearby_apples((row, col))
 
-                spawn_prob = SPAWN_PROB[min(num_apples, 3)]
+                spawn_prob = SPAWN_PROB[min(num_apples, 4)]
                 rand_num = np.random.rand(1)[0]
                 if rand_num < spawn_prob:
                     new_apple_points.append((row, col, 'A'))

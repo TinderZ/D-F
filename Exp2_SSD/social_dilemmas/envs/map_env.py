@@ -170,16 +170,27 @@ class MapEnv(MultiAgentEnv):
 
         info = {}
         for agent_id in self.agents.keys():
-            info[agent_id] = {'apples_collected': 0, 'waste_cleaned': 0}
+            info[agent_id] = {'apples_collected': 0, 'waste_cleaned': 0, 'sustainability': 1.0}
 
         # move
         self.update_moves(agent_actions)
 
         for agent in self.agents.values():
             pos = agent.get_pos()
-            if self.world_map[pos[0], pos[1]] == 'A':
+            char_at_pos = self.world_map[pos[0], pos[1]]
+            if char_at_pos == 'A':
                 self.apple_cooldowns[tuple(pos)] = APPLE_RESPAWN_COOLDOWN
-            new_char = agent.consume(self.world_map[pos[0], pos[1]])
+
+                # sustainability metric - only for harvest environment
+                if hasattr(self, '_count_nearby_apples'):
+                    # an apple is being eaten, so we count neighbors and subtract one for the apple itself
+                    near_apples_cnt = self._count_nearby_apples(pos) - 1
+                    sustainability = (min(near_apples_cnt, 4) - 1) / 4.0
+                    info[agent.agent_id]['sustainability'] = sustainability
+
+            new_char, collected = agent.consume(char_at_pos)
+            if collected > 0:
+                info[agent.agent_id]['apples_collected'] = collected
             self.world_map[pos[0], pos[1]] = new_char
 
         # execute custom moves like firing
