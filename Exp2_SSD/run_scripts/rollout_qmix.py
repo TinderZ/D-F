@@ -21,6 +21,7 @@ class RolloutWorker:
         episode_reward = np.zeros(self.args.num_agents)
         episode_apples_collected = np.zeros(self.args.num_agents)
         episode_waste_cleaned = np.zeros(self.args.num_agents)  # 新增: 为waste数创建一个累加器
+        episode_sustainability = np.zeros(self.args.num_agents)
         # epsilon
         if evaluate:
             epsilon = 1
@@ -50,6 +51,9 @@ class RolloutWorker:
                 if self.args.env == 'Cleanup':
                     if agent_key in infos and 'waste_cleaned' in infos[agent_key]:
                         episode_waste_cleaned[i] += infos[agent_key]['waste_cleaned']
+                if self.args.env == 'Harvest':
+                    if agent_key in infos and 'sustainability' in infos[agent_key]:
+                        episode_sustainability[i] += infos[agent_key]['sustainability']
             episode_reward += np.array(r)
             epi_o.append(o)
             epi_u.append(u)
@@ -63,6 +67,8 @@ class RolloutWorker:
             observation = observation_next
             step += 1
 
+        if step > 0 and self.args.env == "Harvest":
+            episode_sustainability /= step
         episode = dict(o=epi_o.copy(),
                        u=epi_u.copy(),
                        r=epi_r.copy(),
@@ -71,4 +77,4 @@ class RolloutWorker:
                        s=epi_s.copy(),
                        s_next=epi_s_next.copy()
                        )
-        return episode, episode_reward, episode_apples_collected, episode_waste_cleaned
+        return episode, episode_reward, episode_apples_collected, episode_waste_cleaned, episode_sustainability

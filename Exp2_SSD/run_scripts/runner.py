@@ -75,6 +75,7 @@ class Runner:
         cycle_rewards = []
         cycle_apples = []
         cycle_wastes = [] if self.args.env == 'Cleanup' else None
+        cycle_sustainability = [] if self.args.env == 'Harvest' else None
 
         for epi in tqdm(range(self.args.num_episodes)):
             print('Env {}, Run {}, train episode {}'.format(self.args.env, num, epi))
@@ -85,6 +86,9 @@ class Runner:
             if self.args.env == 'Cleanup':
                 episode_wastes_cleaned = rollout_returns[3]
                 cycle_wastes.append(episode_wastes_cleaned)
+            if self.args.env == 'Harvest':
+                episode_sustainability = rollout_returns[4]
+                cycle_sustainability.append(episode_sustainability)
 
 
             cycle_rewards.append(episode_reward)
@@ -143,12 +147,18 @@ class Runner:
                     avg_wastes_cleaned = np.mean(cycle_wastes, axis=0)
                 else:
                     avg_wastes_cleaned = np.zeros(self.args.num_agents)
+                if self.args.env == 'Harvest':
+                    avg_sustainability = np.mean(cycle_sustainability, axis=0)
+                else:
+                    avg_sustainability = np.zeros(self.args.num_agents)
                 # self.episode_rewards[num, :, int(epi/self.args.evaluate_cycle)] = avg_individual_reward
 
                 total_reward = np.sum(avg_individual_reward)
                 total_apples_collected = np.sum(avg_apples_collected)
                 if self.args.env == 'Cleanup':
                     total_wastes_cleaned = np.sum(avg_wastes_cleaned)
+                if self.args.env == 'Harvest':
+                    total_sustainability = np.sum(avg_sustainability)
 
                 apples_variance, apples_std_dev, apples_gini = get_fairness_metrics(avg_apples_collected)
 
@@ -160,11 +170,15 @@ class Runner:
                     self.writer.add_scalar(f"Agent_{i}_apples_collected", avg_apples_collected[i], epi)
                     if self.args.env == 'Cleanup':
                         self.writer.add_scalar(f"Agent_{i}_wastes_cleaned", avg_wastes_cleaned[i], epi)
+                    if self.args.env == 'Harvest':
+                        self.writer.add_scalar(f"Agent_{i}_sustainability", avg_sustainability[i], epi)
 
                 self.writer.add_scalar("Total_reward", total_reward, epi)
                 self.writer.add_scalar("Total_apples_collected", total_apples_collected, epi)
                 if self.args.env == 'Cleanup':
                     self.writer.add_scalar("Total_wastes_cleaned", total_wastes_cleaned, epi)
+                if self.args.env == 'Harvest':
+                    self.writer.add_scalar("Total_sustainability", total_sustainability, epi)
 
                 self.writer.add_scalar("Apples_Variance", apples_variance, epi)
                 self.writer.add_scalar("Apples_StdDev", apples_std_dev, epi)
@@ -177,11 +191,13 @@ class Runner:
                 print(f"training episode {epi}, total_reward {total_reward}, individual_rewards {avg_individual_reward}, individual_apples{avg_apples_collected}, algorithm {self.args.algorithm}")
                 
                 # Now perform evaluation and log with 'eval_' prefix
-                eval_avg_individual_reward, eval_avg_apples_collected, eval_avg_wastes_cleaned = self.evaluate()
+                eval_avg_individual_reward, eval_avg_apples_collected, eval_avg_wastes_cleaned, eval_avg_sustainability = self.evaluate()
                 eval_total_reward = np.sum(eval_avg_individual_reward)
                 eval_total_apples_collected = np.sum(eval_avg_apples_collected)
                 if self.args.env == 'Cleanup':
                     eval_total_wastes_cleaned = np.sum(eval_avg_wastes_cleaned)
+                if self.args.env == 'Harvest':
+                    eval_total_sustainability = np.sum(eval_avg_sustainability)
 
                 eval_apples_variance, eval_apples_std_dev, eval_apples_gini = get_fairness_metrics(eval_avg_apples_collected)
 
@@ -193,11 +209,15 @@ class Runner:
                     self.writer.add_scalar(f"eval_Agent_{i}_apples_collected", eval_avg_apples_collected[i], epi)
                     if self.args.env == 'Cleanup':
                         self.writer.add_scalar(f"eval_Agent_{i}_wastes_cleaned", eval_avg_wastes_cleaned[i], epi)
+                    if self.args.env == 'Harvest':
+                        self.writer.add_scalar(f"eval_Agent_{i}_sustainability", eval_avg_sustainability[i], epi)
 
                 self.writer.add_scalar("eval_Total_reward", eval_total_reward, epi)
                 self.writer.add_scalar("eval_Total_apples_collected", eval_total_apples_collected, epi)
                 if self.args.env == 'Cleanup':
                     self.writer.add_scalar("eval_Total_wastes_cleaned", eval_total_wastes_cleaned, epi)
+                if self.args.env == 'Harvest':
+                    self.writer.add_scalar("eval_Total_sustainability", eval_total_sustainability, epi)
 
                 self.writer.add_scalar("eval_Apples_Variance", eval_apples_variance, epi)
                 self.writer.add_scalar("eval_Apples_StdDev", eval_apples_std_dev, epi)
@@ -215,6 +235,8 @@ class Runner:
                 cycle_apples = []
                 if self.args.env == 'Cleanup':
                     cycle_wastes = []
+                if self.args.env == 'Harvest':
+                    cycle_sustainability = []
 
             
 
@@ -222,6 +244,7 @@ class Runner:
         all_rewards = []
         all_apples = []
         all_wastes = []
+        all_sustainability = []
         for epi in range(self.args.evaluate_epi):
             rollout_returns = self.rolloutWorker.generate_episode(epi, evaluate=True)
             episode_reward, episode_apples = rollout_returns[1], rollout_returns[2]
@@ -230,6 +253,9 @@ class Runner:
             if self.args.env == 'Cleanup':
                 episode_waste = rollout_returns[3]
                 all_wastes.append(episode_waste)
+            if self.args.env == 'Harvest':
+                episode_sustainability = rollout_returns[4]
+                all_sustainability.append(episode_sustainability)
 
         avg_individual_reward = np.mean(all_rewards, axis=0)
         avg_apples_collected = np.mean(all_apples, axis=0)
@@ -237,7 +263,11 @@ class Runner:
             avg_wastes_cleaned = np.mean(all_wastes, axis=0)
         else:
             avg_wastes_cleaned = np.zeros(self.args.num_agents)
-        return avg_individual_reward, avg_apples_collected, avg_wastes_cleaned
+        if self.args.env == 'Harvest':
+            avg_sustainability = np.mean(all_sustainability, axis=0)
+        else:
+            avg_sustainability = np.zeros(self.args.num_agents)
+        return avg_individual_reward, avg_apples_collected, avg_wastes_cleaned, avg_sustainability
 
 
 

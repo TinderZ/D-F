@@ -135,6 +135,12 @@ class Runner_mappo:
                 self.writer.add_scalar("Train_Wastes_Gini", gini, train_steps)
                 print(f"training episode {epi}, total_reward {train_total_reward:.2f}, individual_rewards {[round(r, 2) for r in train_avg_individual_reward]}, individual_apples{[round(a, 2) for a in train_apples_collected_list]}")
             
+            if self.args.env == "Harvest":
+                train_sustainability_list = [np.mean(train_infos[f'Train_infos/agent-{i}/sustainability']) for i in range(num_agents)]
+                self.writer.add_scalar("Train_Total_sustainability", np.sum(train_sustainability_list), train_steps)
+                for i in range(num_agents):
+                    self.writer.add_scalar(f"Train_Agent_{i}_sustainability", train_sustainability_list[i], train_steps)
+
             # --- Log evaluation metrics (1 episode) ---
             eval_infos = collections.defaultdict(list)
             _, observation = self.env.reset()
@@ -180,6 +186,11 @@ class Runner_mappo:
                 self.writer.add_scalar("eval_Wastes_Gini", gini, train_steps)
                 print(f"evaluating episode {epi}, total_reward {eval_total_reward:.2f}, individual_rewards {[round(r, 2) for r in eval_individual_reward]}, individual_apples{[round(a, 2) for a in eval_apples_collected_list]}")
 
+            if self.args.env == "Harvest":
+                eval_sustainability_list = [np.sum(eval_infos[f'eval_infos/agent-{i}/sustainability']) / self.args.num_steps_evaluate for i in range(num_agents)]
+                self.writer.add_scalar("eval_Total_sustainability", np.sum(eval_sustainability_list), train_steps)
+                for i in range(num_agents):
+                    self.writer.add_scalar(f"eval_Agent_{i}_sustainability", eval_sustainability_list[i], train_steps)
         self.writer.close()
 
 
