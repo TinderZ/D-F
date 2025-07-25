@@ -84,13 +84,30 @@ class DQN():
             batch_reward = torch.from_numpy(episode_data['r']).float()
             batch_reward = batch_reward.mean(dim=2)
         if self.args.algorithm == "DQN-IA":
+            # 从numpy数组转换为tensor，形状为(batch, seq, num_agents)
             reward = torch.from_numpy(episode_data['r']).float()
-            batch_reward = torch.from_numpy(episode_data['r'][:, :, agent_id, ...]).float()
-            for ba in range(reward.shape[0]):
-                for st in range(reward.shape[1]):
-                    r = copy.deepcopy(reward[ba,st])
-                    r = r - r[agent_id]
-                    batch_reward[ba,st] = batch_reward[ba,st] - self.args.IA_alpha * r[torch.gt(r, 0)].sum() + self.args.IA_beta * r[torch.le(r, 0)].sum()
+            # 
+            # batch_reward = torch.from_numpy(episode_data['r'][:, :, agent_id, ...]).float()
+            # for ba in range(reward.shape[0]):
+            #     for st in range(reward.shape[1]):
+            #         r = copy.deepcopy(reward[ba,st])
+            #         r = r - r[agent_id]
+            #         batch_reward[ba,st] = batch_reward[ba,st] - self.args.IA_alpha * r[torch.gt(r, 0)].sum() + self.args.IA_beta * r
+            #         [torch.le(r, 0)].sum()
+            
+            # 获取当前智能体的奖励，并增加一个维度以便广播
+            my_reward = reward[:, :, agent_id].unsqueeze(2)  # 形状变为(batch, seq, 1)
+
+            reward_diff = reward - my_reward  # 形状为(batch, seq, num_agents)
+
+            envy = torch.relu(reward_diff)
+            envy_penalty = envy.sum(dim=2)  # 形状为(batch, seq)
+            guilt = torch.min(reward_diff, torch.zeros_like(reward_diff))
+            guilt_penalty = guilt.sum(dim=2)  # 形状为(batch, seq)
+
+            # 获取当前智能体的原始奖励
+            batch_reward = reward[:, :, agent_id]  # 形状为(batch, seq)
+            batch_reward = batch_reward - self.args.IA_alpha * envy_penalty + self.args.IA_beta * guilt_penalty
 
         batch_next_state = torch.from_numpy(episode_data['o_next'][:,:,agent_id,...]).float()
 
